@@ -500,25 +500,6 @@ public class FixpointSolver {
                         reachingViewIds.put(opNode, views);
                     }
                     views.add(viewIdNode);
-                } else if (opNode instanceof NInflate2OpNode) {
-                    // This is basically activity.setContentView(viewId).
-                    // Weirdly, this
-                    // seems to be allowed, but it does not affect our analysis.
-                    // Ignore it
-                    // for now.
-                    if (Configs.verbose) {
-                        System.out.println("viewId " + viewIdNode + " used for " + opNode);
-                    }
-                } else {
-                    // It seems like there are other cases similar to the one
-                    // mentioned,
-                    // TODO Temp workaround
-                    if (Configs.sanityCheck) {
-                        throw new RuntimeException(viewIdNode + " reaching " + opNode);
-                    } else {
-                        Logger.verb("WARNING", "viewId " + viewIdNode + " used for " + opNode
-                                + "\nThis is basically activity.setContentView(viewId) ");
-                    }
                 }
             }
         }
@@ -718,10 +699,6 @@ public class FixpointSolver {
                 } else if (opNode instanceof NInflate2OpNode) {
                     Set<NWindowNode> windows = reachingWindows.get(opNode);
                     if (windows == null || windows.isEmpty()) {
-                        if (Configs.verbose) {
-                            System.out
-                                    .println("[WARNING] No window reaching " + opNode + ", layoutId: " + layoutIdNode);
-                        }
                         continue;
                     }
                     for (NWindowNode windowNode : windows) {
@@ -763,11 +740,7 @@ public class FixpointSolver {
                 if (contextMenu != null) {
                     menuNodes.addAll(contextMenu);
                 }
-                if (menuNodes.isEmpty()) {
-                    if (Configs.verbose) {
-                        System.out.println("[WARNING] No menu reaching " + opNode);
-                    }
-                } else {
+                if (!menuNodes.isEmpty()) {
                     for (NMenuNode menuNode : menuNodes) {
                         doMenuInflate(menuId.getIdValue(), menuNode);
                     }
@@ -1101,11 +1074,7 @@ public class FixpointSolver {
     boolean processFindView1(NFindView1OpNode node) {
         Set<NIdNode> viewIds = reachingViewIds.get(node);
         if (viewIds == null || viewIds.isEmpty()) {
-            // FIXME: dirty hack...
             if (node.type == FindView1Type.Ordinary) {
-                if (Configs.verbose) {
-                    System.out.println("[WARNING] View id unknown at " + node);
-                }
                 return false;
             }
         }

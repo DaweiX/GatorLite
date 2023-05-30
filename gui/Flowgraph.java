@@ -379,11 +379,6 @@ public class Flowgraph implements MethodNames {
                         try {
                             stm = ie.getMethod(); // static target
                         } catch (Exception e) {
-                            if (Configs.verbose) {
-                                Logger.verb("WARNING",
-                                        "Bug in Soot. In Statement " + stm + " have incorrect invoke statement");
-                                e.printStackTrace();
-                            }
                             continue;
                         }
 
@@ -868,10 +863,6 @@ public class Flowgraph implements MethodNames {
         Value viewId = ie.getArg(0);
         NNode idNode = simpleNode(viewId);
         if (idNode == null) {
-            if (Configs.verbose) {
-                System.out.println(
-                        "[WARNING] Unknown view id node for SetId: '" + s + " @ " + jimpleUtil.lookup(s) + "'");
-            }
             return null;
         }
 
@@ -1043,46 +1034,9 @@ public class Flowgraph implements MethodNames {
         }
 
         if (widgetIdNode == null) {
-            if (Configs.verbose) {
-                System.out.println(
-                        "[WARNING] Unknown widget id for FindView1: '" + s + " @ " + jimpleUtil.lookup(s) + "'");
-            }
             return null;
         }
         NVarNode receiverNode = varNode(rcv);
-
-        // Here is the example from walmart app;
-        // In public void
-        // onSuccessSameThread(com.walmart.android.data.StoreItem)
-        // The body is
-        // {
-        // com.walmart.android.app.qr.QRProductPagePresenter$7 r0;
-        // com.walmart.android.data.StoreItem r1;
-        // com.walmart.android.app.qr.QRProductPagePresenter $r2, $r5;
-        // android.view.View $r3, $r6;
-        // java.lang.String $r4;
-
-        // r0 := @this: com.walmart.android.app.qr.QRProductPagePresenter$7;
-        // r1 := @parameter0: com.walmart.android.data.StoreItem;
-        // $r2 = r0.<com.walmart.android.app.qr.QRProductPagePresenter$7:
-        // com.walmart.android.app.qr.QRProductPagePresenter this$0>;
-        // $r3 = staticinvoke
-        // <com.walmart.android.app.qr.QRProductPagePresenter: android.view.View
-        // access$1000(com.walmart.android.app.qr.QRProductPagePresenter)>($r2);
-        // $r4 = virtualinvoke r1.<com.walmart.android.data.StoreItem:
-        // java.lang.String getName()>();
-        // staticinvoke <com.walmart.android.utils.ViewUtil: void
-        // setText(int,android.view.View,java.lang.CharSequence)>(2131231309,
-        // $r3, $r4);
-        // $r5 = r0.<com.walmart.android.app.qr.QRProductPagePresenter$7:
-        // com.walmart.android.app.qr.QRProductPagePresenter this$0>;
-        // $r6 = staticinvoke
-        // <com.walmart.android.app.qr.QRProductPagePresenter: android.view.View
-        // access$1000(com.walmart.android.app.qr.QRProductPagePresenter)>($r5);
-        // virtualinvoke $r6.<android.view.View: android.view.View
-        // findViewById(int)>(2131231309);
-        // return;
-        // }
         if (!(s instanceof DefinitionStmt)) {
             return null;
         }
@@ -1256,16 +1210,11 @@ public class Flowgraph implements MethodNames {
         Value viewId = ie.getArg(0);
         NNode idNode = simpleNode(viewId);
         if (idNode == null) {
-            if (Configs.verbose) {
-                System.out.println(
-                        "[WARNING] Unknown view id node for SetId: '" + s + " @ " + jimpleUtil.lookup(s) + "'");
-            }
             return null;
         }
-        NOpNode setId = new NSetIdOpNode(idNode, receiverNode, new Pair<Stmt, SootMethod>(s, jimpleUtil.lookup(s)),
-                false);
 
-        return setId;
+        return new NSetIdOpNode(idNode, receiverNode, new Pair<Stmt, SootMethod>(s, jimpleUtil.lookup(s)),
+                false);
     }
 
     // SetListener: view.setXYZListener(listenerObject)
@@ -1876,14 +1825,6 @@ public class Flowgraph implements MethodNames {
                     continue;
                 }
                 patchRootlessListActivity(activity);
-            } else {
-                // TODO(tony): remove warnings for activities that call finish()
-                // in its
-                // onCreate(). This information is also useful for model
-                // construction.
-                if (Configs.verbose) {
-                    System.out.println("[WARNING] setContentView() not called on " + activityClass);
-                }
             }
         }
     }
@@ -2183,10 +2124,6 @@ public class Flowgraph implements MethodNames {
      * adapter, so we need to resolve that as well.
      */
     void processRecordedListViewCalls() {
-        if (Configs.verbose) {
-            dumpRecordedListViewCalls();
-        }
-
         // Step 1: resolve the resource id associated with adapter objects
         resolveResourceIdForAdapters();
 
@@ -2214,10 +2151,6 @@ public class Flowgraph implements MethodNames {
             NNode idNode = simpleNode(v);
             if (idNode == null) {
                 // Typically, this is when the value is 0. So, we are fine.
-                if (Configs.verbose) {
-                    System.out.println("[WARNING] Cannot create node for id " + v);
-                    System.out.println("  * " + stringForStmt);
-                }
                 continue;
             }
             NVarNode adapterVar = varNode(jimpleUtil.receiver(s));
@@ -2464,10 +2397,6 @@ public class Flowgraph implements MethodNames {
                     return invokeExpr.getArg(1);
                 } else if (hier.isSubclassOf(callClass, arrayAdapterClass)) {
                     return extractLayoutIdFromAdapterConstructor(s);
-                }
-                if (Configs.verbose) {
-                    System.out
-                            .println("[WARNING] Failed to extract layout id from " + s + " in " + jimpleUtil.lookup(s));
                 }
                 return null;
             }
@@ -3442,24 +3371,6 @@ public class Flowgraph implements MethodNames {
                 if (n instanceof NObjectNode) {
                     if (!(receiverNodeType.isInstance(n))) {
                         continue;
-                        // GraphUtil.verbose = true;
-                        // graphUtil.backwardReachableNodes(receiverNode);
-                        // for (NNode obj : receiverObjects) {
-                        // if (obj instanceof NVarNode) {
-                        // System.out.println(
-                        // " * " + obj + " | " + ((NVarNode)obj).l.getType());
-                        // }
-                        // }
-                        //
-                        // for (Stmt edge : receiverNode.predSites) {
-                        // if (edge != null) {
-                        // System.out.println(" * edge: " + edge);
-                        // }
-                        // }
-                        //
-                        // throw new RuntimeException("Expected type: " +
-                        // receiverNodeType
-                        // + ", but object is: " + n.toString());
                     }
                     resolved = true;
                     E object = receiverNodeType.cast(n);
@@ -4078,9 +3989,6 @@ public class Flowgraph implements MethodNames {
                 }
                 contextMenu.addEdgeTo(fakeMenuNode);
             }
-        }
-        if (!found && Configs.verbose) {
-            System.out.println("[WARNING] No itemSelected method for " + onCreateContextMenuMethod);
         }
     }
 

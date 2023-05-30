@@ -194,9 +194,6 @@ public class AndroidView implements IAndroidView {
     if (!guiName.contains(".")) {
       String cls = Configs.widgetMap.get(guiName);
       if (cls == null) {
-        if (Configs.verbose) {
-          System.out.println("GUI Widget not in the map: " + guiName);
-        }
         cls = "android.widget." + guiName;
       }
       if (!classExists(cls)) {
@@ -230,11 +227,6 @@ public class AndroidView implements IAndroidView {
       } catch (Exception ex) {
         ex.printStackTrace();
         System.err.println("Exception in expanding " + guiName + " in " + guiId);
-      }
-      // klass = Scene.v().tryLoadClass(guiName, SootClass.BODIES);
-      // FIXME: turn this on when resolveGUIName() is done
-      if (klass.isPhantom() && Configs.verbose) {
-        System.err.println("[ERROR] Phantom GUI class `" + klass + "'!");
       }
     } else {
       //Pre-run mode

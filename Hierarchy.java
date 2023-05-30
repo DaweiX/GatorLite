@@ -160,11 +160,6 @@ public class Hierarchy {
       }
     }
 
-    if (Configs.verbose) {
-      System.out.println(
-          "[WARNING] No match in Hierarchy.virtualDispatch: \n\tmethod = "
-              + staticTarget + "\n\ttype = " + receiverClass);
-    }
     return null;
   }
 
@@ -193,11 +188,6 @@ public class Hierarchy {
       } else {
         curr = null; // for java.lang.Object
       }
-    }
-    if (Configs.verbose) {
-      System.out.println(
-          "[WARNING] No match in Hierarchy.virtualDispatch: \n\tmethod subsig = "
-              + staticTargetSubsig + "\n\ttype = " + receiverClass);
     }
     return null;
   }

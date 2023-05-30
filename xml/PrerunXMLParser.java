@@ -63,9 +63,6 @@ public class PrerunXMLParser {
 
       String cls = Configs.widgetMap.get(guiName);
       if (cls == null) {
-        if (Configs.verbose) {
-          System.out.println("[RESOLVELEVEL] GUI Widget not in the map: " + guiName);
-        }
         Configs.onDemandClassSet.add("android.widget." + guiName);
       } else {
         Configs.onDemandClassSet.add(cls);
@@ -231,18 +228,7 @@ public class PrerunXMLParser {
       } else if (guiName.equals("item")) {
         guiName = "android.view.MenuItem";
       } else if (guiName.equals("group")) {
-        // TODO(tony): we might want to create a special fake class to
-        // represent menu groups. But for now, let's simply pretend it's
-        // a ViewGroup. Also, print a warning when we do see <group>
-        if (Configs.verbose) {
-          System.out.println("[TODO] <group> used in " + file);
-        }
         guiName = "android.view.ViewGroup";
-      } else {
-        if (Configs.verbose) {
-          Logger.verb("XML", "Unhandled menu tag " + guiName);
-        }
-        //throw new RuntimeException("Unhandled menu tag " + guiName);
       }
       resolveGUINameSTR(guiName);
       NodeList children = node.getChildNodes();

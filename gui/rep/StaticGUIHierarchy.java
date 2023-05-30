@@ -133,9 +133,6 @@ public class StaticGUIHierarchy extends GUIHierarchy {
         }
         NObjectNode objectNode = (NObjectNode) node;
         if (visitingNodes.contains(node)) {
-            if (Configs.verbose) {
-                System.out.println("[WARNING] Node " + node + " already printed. Cycle!!!");
-            }
             return;
         }
         visitingNodes.add(node);

@@ -264,10 +264,6 @@ class DefaultXMLParser extends AbstractXMLParser {
 
 						String cls = Helper.getClassName(partialClassName, appPkg);
 						services.add(cls);
-
-						if (Configs.verbose) {
-							Logger.verb("XML", "Service: " + cls);
-						}
 					}
 				} catch (NullPointerException ne) {
 					// A work around for uk.co.busydoingnothing.catverbs_5.apk
@@ -367,13 +363,6 @@ class DefaultXMLParser extends AbstractXMLParser {
 
 		assert workingMap != null;
 		assert invWorkingMap != null;
-
-		if (Configs.verbose) {
-			if (workingMap.containsKey(name) || invWorkingMap.containsKey(value)) {
-				System.out.println(
-						"[VERB] DefaultXML Parser feedIdIntoGeneralMap name value conflicts at " + name + ":" + value);
-			}
-		}
 		workingMap.put(name, value);
 		invWorkingMap.put(value, name);
 	}
@@ -603,9 +592,6 @@ class DefaultXMLParser extends AbstractXMLParser {
 
 			String file = getLayoutFilePath(resRoot, layoutFileName, isSys);
 			if (file == null) {
-				if (Configs.verbose) {
-					System.err.println("[WARNING] Cannot find " + layoutFileName + ".xml in " + resRoot);
-				}
 				continue;
 			}
 
@@ -626,10 +612,6 @@ class DefaultXMLParser extends AbstractXMLParser {
 
 			String file = getLayoutFilePath(Configs.resourceLocation, layoutFileName, false);
 			if (file == null) {
-				if (Configs.verbose) {
-					System.err
-							.println("[WARNING] Cannot find " + layoutFileName + ".xml in " + Configs.resourceLocation);
-				}
 				continue;
 			}
 
@@ -844,19 +826,9 @@ class DefaultXMLParser extends AbstractXMLParser {
 		assert workingMap != null;
 		HashMap<String, Integer> workingIdMap = workingMap.get(type);
 		if (workingIdMap == null) {
-			if (Configs.verbose) {
-				Logger.verb("XMLID", "id type: " + type + " does not exist sys:" + isSys);
-			}
 			return null;
 		}
-		Integer rtnVal = workingIdMap.get(name);
-
-		if (rtnVal == null) {
-			if (Configs.verbose) {
-				Logger.verb("XMLID", "id " + name + " in type " + type + " does not exist sys:" + isSys);
-			}
-		}
-		return rtnVal;
+		return workingIdMap.get(name);
 	}
 
 	private String lookupNameInGeneralMap(String type, Integer val, boolean isSys) {
@@ -872,19 +844,9 @@ class DefaultXMLParser extends AbstractXMLParser {
 		assert workingMap != null;
 		HashMap<Integer, String> workingIdMap = workingMap.get(type);
 		if (workingIdMap == null) {
-			if (Configs.verbose) {
-				Logger.verb("XMLID", "id type: " + type + " does not exist");
-			}
 			return null;
 		}
-		String rtnVal = workingIdMap.get(val);
-
-		if (rtnVal == null) {
-			if (Configs.verbose) {
-				Logger.verb("XMLID", "val " + val + " in type " + type + " does not exist");
-			}
-		}
-		return rtnVal;
+		return workingIdMap.get(val);
 	}
 
 	private String lookupNameInGeneralMap(Integer val, boolean isSys) {
@@ -983,9 +945,6 @@ class DefaultXMLParser extends AbstractXMLParser {
 			viewMap.put(val, root);
 			String file = getMenuFilePath(resRoot, name, isSys);
 			if (file == null) {
-				if (Configs.verbose) {
-					System.err.println("Unknown menu " + name + " for " + resRoot);
-				}
 				continue;
 			}
 			root.setOrigin(file);
@@ -1075,15 +1034,7 @@ class DefaultXMLParser extends AbstractXMLParser {
 				// TODO(tony): we might want to create a special fake class to
 				// represent menu groups. But for now, let's simply pretend it's
 				// a ViewGroup. Also, print a warning when we do see <group>
-				if (Configs.verbose) {
-					System.out.println("[TODO] <group> used in " + file);
-				}
 				guiName = "android.view.ViewGroup";
-			} else {
-				if (Configs.verbose) {
-					Logger.verb("XML", "Unhandled menu tag " + guiName);
-				}
-				// throw new RuntimeException("Unhandled menu tag " + guiName);
 			}
 			if (debug) {
 				System.out.println(guiName + " (" + guiId + ", " + id + ")");
@@ -1219,9 +1170,6 @@ class DefaultXMLParser extends AbstractXMLParser {
 			doc = dBuilder.parse(file);
 		} catch (Exception ex) {
 			throw new RuntimeException(ex);
-		}
-		if (Configs.verbose) {
-			System.out.println("--- Reading " + file);
 		}
 		NodeList nodes = doc.getElementsByTagName("string");
 		if (nodes == null) {

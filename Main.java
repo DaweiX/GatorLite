@@ -41,8 +41,6 @@ public class Main {
                 Configs.android = args[++i];
             } else if ("-jre".equals(s)) {
                 Configs.jre = args[++i];
-            } else if ("-debugCode".equals(s)) {
-                Configs.debugCodes.add(args[++i]);
             } else if ("-client".equals(s)) {
                 Configs.clients.add(args[++i]);
             } else if ("-withCHA".equals(s)) {
@@ -139,7 +137,7 @@ public class Main {
                     "-cp", classpath,
             };
             readWidgetMap();
-            PrerunEntrypoint.v().run();
+            PreRunEntrypoint.v().run();
             setupAndInvokeSootHelper(packName, phaseName, sootArgs);
         } else {
             String packName = "cg";
@@ -155,7 +153,7 @@ public class Main {
                     "-cp", classpath,
             };
             readWidgetMap();
-            PrerunEntrypoint.v().run();
+            PreRunEntrypoint.v().run();
             setupAndInvokeSootHelper(packName, phaseName, sootArgs);
         }
     }

@@ -138,13 +138,7 @@ public abstract class NNode {
 			return;
 		}
 		succSites.add(s);
-		if (verbose) {
-			if (s == null) {
-				System.out.println(this + " ==> " + x);
-			} else {
-				System.out.println(this + " ==> " + x + " [" + s + "]");
-			}
-		}
+
 		// predecessors
 		if (x.pred == null) {
 			x.pred = Lists.newArrayListWithCapacity(4);

@@ -60,10 +60,6 @@ public class Configs {
   // xml file describing listeners
   public static String listenerSpecFile;
 
-  public static boolean verbose = false;
-
-  public static Set<String> debugCodes = Sets.newHashSet();
-
   public static Set<String> clients = Sets.newHashSet();
 
   public static boolean withCHA = false;
