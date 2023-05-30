@@ -96,9 +96,6 @@ public class Configs {
   // [wtg analysis] handle asynchronous operations specially
   public static AsyncOpStrategy asyncStrategy = AsyncOpStrategy.Default_EventHandler_Async;
 
-  // [wtg analysis] generate test cases
-  public static boolean genTestCase = false;
-
   // [test generation] allow loop in wtg forward traversal
   public static boolean allowLoop = false;
 
@@ -107,19 +104,11 @@ public class Configs {
 
   public static boolean sanityCheck = false;
 
-  // [test generation] test cases generation strategy
-  public static TestGenStrategy testGenStrategy = null;
-
-  public static boolean instrument = false;
-
   // Mock testing flags
   public static boolean mockScene = false;
 
-  // hailong: arguments for clients
-  public static Set<String> clientParams = Sets.newHashSet();
-
   // Path output file name
-  public static String pathoutfilename = "";
+  public static String outFile = "";
 
   public static String monitoredClass = "";
 
@@ -175,8 +164,7 @@ public class Configs {
       }
       br.close();
       fr.close();
-    } catch (Exception e) {
-    }
+    } catch (Exception ignored) {}
   }
 
   public static void processing() {
@@ -206,7 +194,7 @@ public class Configs {
 
     numericApiLevel = Integer.parseInt(apiLevel.substring("android-".length()));
     sysProj = Configs.sdkDir + "/platforms/" + Configs.apiLevel + "/data";
-    if (resourceLocation.indexOf(":") == -1) {
+    if (!resourceLocation.contains(":")) {
       //Only 1 res directory existed
       resourceLocationList.add(resourceLocation);
     } else {

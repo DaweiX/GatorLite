@@ -301,11 +301,6 @@ public class FixpointSolver {
                 // Sanity check. If fail, exception.
                 if (graphUtil.reachableNodes(listenerObject).contains(setListener.getParameter())) {
                     if (!listenerSpecs.isListenerType(listenerObject.getClassType())) {
-                        String msg = "[WARNING] Non-listener " + listenerObject + " reaching " + setListener;
-                        Debug.v().printf("%s\n", msg);
-                        if (Configs.verbose) {
-                            System.out.println(msg);
-                        }
                         continue;
                     }
                     MultiMapUtil.addKeyAndHashSetElement(solutionListeners, setListener, n);
@@ -426,13 +421,7 @@ public class FixpointSolver {
                         || opNode instanceof NFindView2OpNode) && reachables.contains(opNode.getReceiver())) {
                     MultiMapUtil.addKeyAndHashSetElement(reachingWindows, opNode, windowNode);
                 } else if (opNode instanceof NSetListenerOpNode && reachables.contains(opNode.getParameter())) {
-                    if (Configs.debugCodes.contains(Debug.LISTENER_DEBUG)) {
-                        System.out.println("[WindowAsListener] " + windowNode + " -> " + opNode);
-                    }
                     MultiMapUtil.addKeyAndHashSetElement(reachingListeners, opNode, windowNode);
-                } else {
-                    // throw new RuntimeException(objectNode + " reaching " +
-                    // opNode);
                 }
             }
         }
@@ -1122,31 +1111,16 @@ public class FixpointSolver {
         }
         Set<NNode> receivers = solutionReceivers.get(node);
         if (receivers == null || receivers.isEmpty()) {
-            if (Configs.debugCodes.contains(Debug.WORKLIST_DEBUG)) {
-                System.out.println("!!! no rcv sol for " + node + " yet");
-            }
-            // for (NNode rcv : reachingReceiverViews.get(node)) {
-            // System.out.println(" possible: " + rcv);
-            // }
             return false;
-        }
-        if (Configs.debugCodes.contains(Debug.WORKLIST_DEBUG)) {
-            System.out.println("--- solving " + node);
         }
         Set<NNode> solution = solutionResults.get(node);
         int oldSize = solution.size();
         for (NNode receiver : receivers) {
-            if (Configs.debugCodes.contains(Debug.WORKLIST_DEBUG)) {
-                System.out.println("  [FV1] rcv: " + receiver);
-            }
             // Compute descendantNodes() to walk the view hierarchy
             Set<NNode> descendants = graphUtil.descendantNodes(receiver);
             boolean found = false;
             if (viewIds != null && !viewIds.isEmpty()) {
                 for (NNode lhs : descendants) {
-                    if (Configs.debugCodes.contains(Debug.WORKLIST_DEBUG)) {
-                        System.out.println("  * lhs: " + lhs);
-                    }
                     NNode idNode = extractIdNode(lhs);
                     if (viewIds.contains(idNode)) {
                         found = true;
@@ -1179,16 +1153,10 @@ public class FixpointSolver {
     boolean processFindView2(NFindView2OpNode node) {
         Set<NIdNode> viewIds = reachingViewIds.get(node);
         if (viewIds == null || viewIds.isEmpty()) {
-            if (Configs.verbose) {
-                System.out.println("[WARNING] View id unknown at " + node);
-            }
             return false;
         }
         Set<NWindowNode> windows = reachingWindows.get(node);
         if (windows == null || windows.isEmpty()) {
-            if (Configs.verbose) {
-                System.out.println("[WARNING] Window unknown at " + node);
-            }
             return false;
         }
         Set<NNode> solution = solutionResults.get(node);
@@ -1236,14 +1204,10 @@ public class FixpointSolver {
         int oldSize = solution.size();
         Set<NNode> receiverSet = solutionReceivers.get(node);
         if (receiverSet == null || receiverSet.isEmpty()) {
-            // System.out.println("[FV3] no rcv sol for " + node + " yet");
-            // for (NNode rcv : reachingReceiverViews.get(node)) {
-            // System.out.println(" possible: " + rcv);
-            // }
             return false;
         }
         for (NNode receiver : receiverSet) {
-            Set<NNode> descendants = null;
+            Set<NNode> descendants;
             FindView3Type type = node.type;
             if (type == FindView3Type.FindChildren) {
                 descendants = receiver.getChildren();
@@ -1316,9 +1280,6 @@ public class FixpointSolver {
         for (NNode parent : parentSet) {
             for (NNode child : childSet) {
                 if (parent == child) {
-                    if (Configs.verbose) {
-                        System.out.println("[WARNING] p.addView(p) for " + node + "\np=" + parent);
-                    }
                     continue;
                 }
                 if (!parent.hasChild(child)) {
@@ -1337,9 +1298,6 @@ public class FixpointSolver {
             // For some reason, layout id can be used in setId() as well
             viewIds = reachingLayoutIds.get(node);
             if (viewIds == null || viewIds.isEmpty()) {
-                if (Configs.verbose) {
-                    System.out.println("[WARNING] View id unknown at " + node);
-                }
                 return false;
             }
         }
@@ -1383,7 +1341,6 @@ public class FixpointSolver {
         NNode textNode = node.getParameter();
         boolean resolved = false;
         boolean changed = false;
-        // GraphUtil.verbose = true;
         for (NNode n : graphUtil.backwardReachableNodes(textNode)) {
             if (n instanceof NStringConstantNode || n instanceof NStringIdNode) {
                 resolved = true;
@@ -1392,12 +1349,6 @@ public class FixpointSolver {
                         changed = true;
                     }
                 }
-            }
-        }
-        // GraphUtil.verbose = false;
-        if (!resolved) {
-            if (Configs.verbose) {
-                System.out.println("[WARNING] Text unknown at " + node);
             }
         }
         return changed;
@@ -1414,10 +1365,8 @@ public class FixpointSolver {
         if (receiverSet == null || receiverSet.isEmpty()) {
             return false;
         }
-        // GraphUtil.verbose = true;
         for (NNode n : graphUtil.backwardReachableNodes(resourceNode)) {
             if (n instanceof NDrawableIdNode) {
-                resolved = true;
                 for (NNode receiver : receiverSet) {
                     if (receiver.addDrawableNode(n)) {
                         changed = true;
@@ -1425,13 +1374,6 @@ public class FixpointSolver {
                 }
             }
         }
-        // GraphUtil.verbose = false;
-        if (!resolved) {
-            if (Configs.verbose) {
-                System.out.println("[WARNING] Text unknown at " + node);
-            }
-        }
-
         return changed;
     }
 
@@ -1470,9 +1412,6 @@ public class FixpointSolver {
                 for (NNode s : solution) {
                     if (isValidFlowByType(s, call, VarType.Parameter)) {
                         trueSolution.add(s);
-                        if (Configs.debugCodes.contains(Debug.WORKLIST_DEBUG)) {
-                            System.out.println("  [PROP] src: " + node + ", tgt: " + call + ", par: " + s);
-                        }
                     }
                 }
                 Set<NNode> parameterSolutionSet = solutionMap.get(call);
@@ -1499,9 +1438,6 @@ public class FixpointSolver {
                 for (NNode s : solution) {
                     if (isValidFlowByType(s, call, VarType.Receiver)) {
                         trueSolution.add(s);
-                        if (Configs.debugCodes.contains(Debug.WORKLIST_DEBUG)) {
-                            System.out.println("  [PROP] src: " + node + ", tgt: " + call + ", rcv: " + s);
-                        }
                     }
                 }
                 Set<NNode> receiverSolutionSet = solutionReceivers.get(call);
@@ -1570,11 +1506,7 @@ public class FixpointSolver {
             throw new RuntimeException("Unknown solutionNode: " + solutionNode);
         }
         SootClass targetType = ((RefType) targetNode.l.getType()).getSootClass();
-        boolean result = isCompatible(targetType, sourceType);
-        if (!result && Configs.debugCodes.contains(Debug.TYPE_FILTER_DEBUG)) {
-            System.out.println("[TypeFilter] source: " + sourceType + ", target: " + targetType);
-        }
-        return result;
+        return isCompatible(targetType, sourceType);
     }
 
     boolean isCompatible(SootClass high, SootClass low) {

@@ -18,7 +18,6 @@ import com.google.common.collect.Multimap;
 import com.google.common.collect.Sets;
 
 import presto.android.Configs;
-import presto.android.Debug;
 import presto.android.Logger;
 import presto.android.gui.GUIAnalysisOutput;
 import presto.android.gui.graph.NActivityNode;
@@ -63,7 +62,6 @@ public class WTGBuilder {
 	public void build(GUIAnalysisOutput output) {
 		preBuild(output);
 		building();
-		postBuild();
 	}
 
 	public WTGBuilder() {
@@ -132,13 +130,6 @@ public class WTGBuilder {
 		flowgraphRebuilder = FlowgraphRebuilder.v(guiOutput);
 		// initialize wtg edge builder
 		cfgAnalyzer = new CFGAnalyzer(guiOutput, flowgraphRebuilder);
-	}
-
-	// post build
-	private void postBuild() {
-		if (Configs.debugCodes.contains(Debug.DUMP_CCFX_DEBUG)) {
-			wtg.dump();
-		}
 	}
 
 	private void ignoreEdges(List<Multimap<WTGEdgeSig, WTGEdge>> stageOutput) {

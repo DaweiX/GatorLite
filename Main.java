@@ -53,8 +53,6 @@ public class Main {
                 Configs.wtgSpecFile = args[++i];
             } else if ("-implicitIntent".equals(s)) {
                 Configs.implicitIntent = true;
-            } else if ("-instrument".equals(s)) {
-                Configs.instrument = true;
             } else if ("-resolveContext".equals(s)) {
                 Configs.resolveContext = true;
             } else if ("-trackWholeExec".equals(s)) {
@@ -81,20 +79,15 @@ public class Main {
                 Configs.allowLoop = true;
             } else if ("-epDepth".equals(s)) {
                 Configs.epDepth = Integer.parseInt(args[++i]);
-            } else if ("-clientParam".equals(s)) {
-                Configs.clientParams.add(args[++i]);
             } else if ("-async".equals(s)) {
                 Configs.asyncStrategy = AsyncOpStrategy.valueOf(args[++i]);
-            } else if ("-genTestCase".equals(s)) {
-                Configs.genTestCase = true;
-            } else if ("-outputFile".equals(s)){
-                Configs.pathoutfilename = args[++i];
+            } else if ("-out".equals(s)){
+                Configs.outFile = args[++i];
             } else if ("-monitoredClass".equals(s)){
                 Configs.monitoredClass = args[++i];
             } else if ("-libraryPackageListFile".equals(s)) {
                 Configs.libraryPackageFile = args[++i];
             } else if ("-libraryPackageName".equals(s)) {
-                Logger.verb("VERB", "append pkg " + args[i + 1]);
                 Configs.addLibraryPackage(args[++i]);
             } else if ("-classListFile".equals(s)) {
                 Configs.classListFile = args[++i];

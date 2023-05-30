@@ -951,23 +951,11 @@ public class Flowgraph implements MethodNames {
             NVarNode outsideRootNode = varNode(outsideRoot); // parent
             inflate1 = new NInflate1OpNode(layoutIdNode, fakeLocalNode, callSite, false);
             NOpNode addView2 = new NAddView2OpNode(outsideRootNode, fakeLocalNode,
-                    new Pair<Stmt, SootMethod>(s, jimpleUtil.lookup(s)), false);
+                    new Pair<>(s, jimpleUtil.lookup(s)), false);
             allNNodes.add(addView2);
-            if (Configs.debugCodes.contains(Debug.OP_NODE_DEBUG)) {
-                System.out.println(
-                        "[AddView2] parent: " + outsideRootNode + ", child: " + fakeLocalNode + " @ " + addView2);
-                System.out.println("[Inflate1] lhs: " + inflate1.getLhs());
-            }
             if (lhsNode != null) {
                 fakeLocalNode.addEdgeTo(lhsNode, s);
             }
-        }
-
-        if (Configs.debugCodes.contains(Debug.OP_NODE_DEBUG)) {
-            System.out.printf("[Inflate1] id: %s, lhs: %s, outside: %s @ %s\n", layoutIdNode,
-                    (lhsNode == null ? "<NULL>" : lhsNode.toString()),
-                    (outsideRoot == null ? "<NULL>" : varNode(outsideRoot).toString()), inflate1.shortDescription());
-            System.out.println("  stmt: " + s + " @ " + jimpleUtil.lookup(s));
         }
 
         return inflate1;
@@ -1100,17 +1088,10 @@ public class Flowgraph implements MethodNames {
         }
 
         NVarNode lhsNode = varNode(jimpleUtil.lhsLocal(s));
-        NOpNode findView1 = new NFindView1OpNode(widgetIdNode, receiverNode, lhsNode,
-                new Pair<Stmt, SootMethod>(s, jimpleUtil.lookup(s)),
+
+        return new NFindView1OpNode(widgetIdNode, receiverNode, lhsNode,
+                new Pair<>(s, jimpleUtil.lookup(s)),
                 menuFindItem ? FindView1Type.MenuFindItem : FindView1Type.Ordinary, false);
-
-        if (Configs.debugCodes.contains(Debug.OP_NODE_DEBUG)) {
-            System.out.println("[FindView1] view: " + receiverNode + ", id: " + widgetIdNode + ", lhs: " + lhsNode
-                    + " @ " + findView1.shortDescription());
-            System.out.println("  stmt: " + s + " @ " + jimpleUtil.lookup(s));
-        }
-
-        return findView1;
     }
 
     // FindView2: lhs = act.findViewById(id)
@@ -1146,16 +1127,9 @@ public class Flowgraph implements MethodNames {
             System.out.println("[WARNING] Null layout id for " + s + " @ " + caller);
             return NOpNode.NullNode;
         }
-        NOpNode findView2 = new NFindView2OpNode(layoutIdNode, receiverNode, lhsNode,
-                new Pair<Stmt, SootMethod>(s, caller), false);
 
-        if (Configs.debugCodes.contains(Debug.OP_NODE_DEBUG)) {
-            System.out.println("[FindView2] id: " + layoutIdNode + ", act: " + receiverNode + ", lhs: " + lhsNode
-                    + " @ " + findView2.shortDescription());
-            System.out.println("  stmt: " + s + " @ " + jimpleUtil.lookup(s));
-        }
-
-        return findView2;
+        return new NFindView2OpNode(layoutIdNode, receiverNode, lhsNode,
+                new Pair<>(s, caller), false);
     }
 
     // FindView3: lhs = view.findSomething()
@@ -1213,16 +1187,8 @@ public class Flowgraph implements MethodNames {
         }
         NVarNode receiverNode = varNode(jimpleUtil.receiver(ie));
         NNode lhsNode = varNode(jimpleUtil.lhsLocal(s));
-        NOpNode findView3 = new NFindView3OpNode(receiverNode, lhsNode,
-                new Pair<Stmt, SootMethod>(s, jimpleUtil.lookup(s)), type, false);
-
-        if (Configs.debugCodes.contains(Debug.OP_NODE_DEBUG)) {
-            System.out.println(
-                    "[FindView3] view: " + receiverNode + ", lhs: " + lhsNode + " @ " + findView3.shortDescription());
-            System.out.println("  stmt: " + s + " @ " + jimpleUtil.lookup(s));
-        }
-
-        return findView3;
+        return new NFindView3OpNode(receiverNode, lhsNode,
+                new Pair<>(s, jimpleUtil.lookup(s)), type, false);
     }
 
     // AddView1: act/dialog.setContentView(view)
@@ -1496,10 +1462,6 @@ public class Flowgraph implements MethodNames {
                     viewNode, setListener, s, caller, registration, isContextMenuSetListener);
         }
 
-        if (Configs.debugCodes.contains(Debug.OP_NODE_DEBUG) || Configs.debugCodes.contains(Debug.LISTENER_DEBUG)) {
-            System.out.printf("[SetListener] view: %s, listener: %s @ %s\n  stmt: %s @ %s\n", viewNode, listenerNode,
-                    setListener.shortDescription(), callSite.getO1(), callSite.getO2());
-        }
         return setListener;
     }
 
@@ -1569,9 +1531,6 @@ public class Flowgraph implements MethodNames {
         // Finally, create flow edges to represent the link between SetListener
         // and the dispatched callback methods.
         for (SootMethod h : handlers) {
-            if (Configs.debugCodes.contains(Debug.LISTENER_DEBUG)) {
-                System.out.println("{SL->CB} " + setListener + " ===> " + h);
-            }
             listenerNode.addEdgeTo(varNode(jimpleUtil.thisLocal(h)), s);
 
             String handlerSubsig = h.getSubSignature();
@@ -1702,17 +1661,7 @@ public class Flowgraph implements MethodNames {
         if (titleSpecifier != null) {
             NOpNode setText = new NSetTextOpNode(titleSpecifier, menuItem, callSite);
             allNNodes.add(setText);
-            // System.out.println("{Menu.add} menuItem: " + menuItem + ", title:
-            // "
-            // + titleSpecifier);
         }
-
-        if (Configs.debugCodes.contains(Debug.MENU_DEBUG)) {
-            System.out.println(
-                    "[AddMenuItem] menu: " + menu + ", menuItem: " + menuItem + " @ " + addMenuItem.shortDescription());
-            System.out.println("  stmt: " + s + " @ " + jimpleUtil.lookup(s));
-        }
-
         return addMenuItem;
     }
 
@@ -1766,13 +1715,8 @@ public class Flowgraph implements MethodNames {
         Value menuIdVal = ie.getArg(0);
         NNode menuIdNode = simpleNode(menuIdVal);
         NNode menuNode = simpleNode(ie.getArg(1));
-        Pair<Stmt, SootMethod> callSite = new Pair<Stmt, SootMethod>(s, jimpleUtil.lookup(s));
-        NOpNode menuInflate = new NMenuInflateOpNode(menuIdNode, menuNode, callSite, false);
-
-        if (Configs.debugCodes.contains(Debug.MENU_DEBUG)) {
-            System.out.println("--- [CREATED] " + menuInflate);
-        }
-        return menuInflate;
+        Pair<Stmt, SootMethod> callSite = new Pair<>(s, jimpleUtil.lookup(s));
+        return new NMenuInflateOpNode(menuIdNode, menuNode, callSite, false);
     }
 
     // GetTabHost: lhs = TabActivity.getTabHost()
@@ -2005,9 +1949,6 @@ public class Flowgraph implements MethodNames {
     SootClass createFakeOnItemClickListenerClass(NActivityNode listActivityNode, NVarNode listViewNode,
                                                  NVarNode listItemNode, SootMethod handlerMethod) {
         String fakeListenerClassName = nextFakeName();
-        Debug.v().printf("[Flowgraph] Create %s for activity %s | %s | %s | %s\n", fakeListenerClassName,
-                listActivityNode.toString(), listViewNode.toString(), listItemNode.toString(),
-                handlerMethod.getSignature());
         SootClass fakeListenerClass = new SootClass(fakeListenerClassName);
         SootClass superClass = Scene.v().getSootClass("android.widget.AdapterView$OnItemClickListener");
         fakeListenerClass.addInterface(superClass);
@@ -2336,10 +2277,7 @@ public class Flowgraph implements MethodNames {
         // Assume adapter flow is only intra-procedural.
         SootMethod caller = jimpleUtil.lookup(setAdapterCall);
         Set<NNode> sources = graphUtil.backwardReachableNodes(varNode(adapter));
-        Pair<Stmt, SootMethod> callSite = new Pair<Stmt, SootMethod>(setAdapterCall, caller);
-        if (Configs.debugCodes.contains(Debug.LIST_ADAPTER_DEBUG)) {
-            System.out.println("--- SetAdapter: " + setAdapterCall + " in " + caller);
-        }
+        Pair<Stmt, SootMethod> callSite = new Pair<>(setAdapterCall, caller);
         for (NNode src : sources) {
             if (!(src instanceof NObjectNode)) {
                 continue;
@@ -2348,11 +2286,7 @@ public class Flowgraph implements MethodNames {
             if (concreteType == null)
                 continue;
             SootMethod getView = concreteType.getMethod(getViewSubSig);
-            if (Configs.debugCodes.contains(Debug.LIST_ADAPTER_DEBUG)) {
-                System.out.println("  * " + getView);
-            }
             // We handle ArrayAdapter only for now.
-            // if (!hier.isSubclassOf(concreteType, arrayAdapterClass)) {
             if (!hier.isSubclassOf(concreteType, baseAdapterClass)) {
                 return;
             }
@@ -2365,9 +2299,6 @@ public class Flowgraph implements MethodNames {
                         NVarNode listItemNode = varNode((Local) returnValue);
                         NOpNode addView2 = new NAddView2OpNode(listViewNode, listItemNode, callSite, true);
                         allNNodes.add(addView2);
-                        if (Configs.debugCodes.contains(Debug.LIST_ADAPTER_DEBUG)) {
-                            System.out.println("  [AV2] parent: " + listViewNode + ", child: " + listItemNode);
-                        }
                     } else if (!(returnValue instanceof NullConstant)) {
                         System.out.println("[WARNING] Unexpected return value for " + getView);
                     }
@@ -2375,9 +2306,6 @@ public class Flowgraph implements MethodNames {
                 // 2) Connect list view parameter
                 NVarNode viewGroupNode = varNode(jimpleUtil.localForNthParameter(getView, 3));
                 listViewNode.addEdgeTo(viewGroupNode, setAdapterCall);
-                if (Configs.debugCodes.contains(Debug.LIST_ADAPTER_DEBUG)) {
-                    System.out.println("  [Edge] " + listViewNode + " ---> " + viewGroupNode);
-                }
             } else {
                 // Library-defined adapter type
                 if (!(src instanceof NAllocNode)) {
@@ -2461,7 +2389,7 @@ public class Flowgraph implements MethodNames {
                 if (layouts == null || layouts.isEmpty()) {
                     System.out.println("Cannot find layout for " + adapterGetViewCall + " @ " + caller);
                 } else {
-                    Pair<Stmt, SootMethod> callSite = new Pair<Stmt, SootMethod>(adapterGetViewCall, caller);
+                    Pair<Stmt, SootMethod> callSite = new Pair<>(adapterGetViewCall, caller);
                     NNode lhsNode = varNode(jimpleUtil.lhsLocal(adapterGetViewCall));
                     for (NNode layoutNode : layouts) {
                         NOpNode inflate1 = new NInflate1OpNode(layoutNode, lhsNode, callSite, true);
@@ -3264,8 +3192,6 @@ public class Flowgraph implements MethodNames {
     SootClass createFakeOnClickListenerClass(NDialogNode alertDialog, NVarNode dialogInterfaceOnClickListener,
                                              SootMethod handlerMethod, int which) {
         String fakeListenerClassName = nextFakeName();
-        Debug.v().printf("[Flowgraph] Create %s for dialog %s | %s @ %s | %s\n", fakeListenerClassName, alertDialog,
-                String.valueOf(alertDialog.allocStmt), String.valueOf(alertDialog.allocMethod), handlerMethod.getSignature());
         SootClass fakeListenerClass = new SootClass(fakeListenerClassName);
         SootClass superClass = Scene.v().getSootClass("android.view.View$OnClickListener");
         fakeListenerClass.addInterface(superClass);
