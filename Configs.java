@@ -30,6 +30,7 @@ public class Configs {
 
   // location of AndroidMainifest file
   public static String manifestLocation;
+  public static String gatorRoot;
 
   // location of the resource xml root
   public static String resourceLocation;
@@ -190,15 +191,7 @@ public class Configs {
 
     numericApiLevel = Integer.parseInt(apiLevel.substring("android-".length()));
     sysProj = Configs.sdkDir + "/platforms/" + Configs.apiLevel + "/data";
-    if (!resourceLocation.contains(":")) {
-      //Only 1 res directory existed
-      resourceLocationList.add(resourceLocation);
-    } else {
-      String[] resourceLocArray = resourceLocation.split(":");
-      resourceLocationList.addAll(Arrays.asList(resourceLocArray));
-      resourceLocation = resourceLocationList.get(0);
-    }
-
+    resourceLocationList.add(resourceLocation);
     extLibs = Lists.newArrayList();
 
     validate();

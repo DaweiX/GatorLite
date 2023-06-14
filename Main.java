@@ -37,7 +37,9 @@ public class Main {
                 Configs.sdkDir = args[++i];
             } else if ("-apiLevel".equals(s)) {
                 Configs.apiLevel = args[++i];
-            } else if ("-android".equals(s)) {
+            } else if ("-gatorRoot".equals(s)) {
+                Configs.gatorRoot = args[++i];
+            }else if ("-android".equals(s)) {
                 Configs.android = args[++i];
             } else if ("-jre".equals(s)) {
                 Configs.jre = args[++i];
@@ -104,14 +106,21 @@ public class Main {
 
     static String computeClasspath() {
         // Compute classpath
+        boolean isWindows = System.getProperty("os.name").contains("Windows");
+        String sep = isWindows ? ";" : ":";
         StringBuilder classpathBuffer =
-                new StringBuilder(Configs.android + ":" + Configs.jre);
+                new StringBuilder(Configs.android);
         for (String s : Configs.depJars) {
-            classpathBuffer.append(":").append(s);
+            classpathBuffer.append(sep).append(s);
+        }
+        if (Configs.jre.length() > 0) {
+            classpathBuffer.append(":").append(Configs.jre);
         }
 
-        for (String s : Configs.extLibs) {
-            classpathBuffer.append(":").append(s).append("/bin/classes");
+        if (!isWindows) {
+            for (String s : Configs.extLibs) {
+                classpathBuffer.append(":").append(s).append("/bin/classes");
+            }
         }
 
         return classpathBuffer.toString();
@@ -180,7 +189,7 @@ public class Main {
     static void readWidgetMap() {
         //This is an on demand implementation of signature patch
         try {
-            String GatorRootPath = System.getenv("GatorRoot");
+            String GatorRootPath = Configs.gatorRoot;
             FileReader fr = new FileReader(GatorRootPath + Configs.widgetMapFile);
             BufferedReader br = new BufferedReader(fr);
             String curLine;

@@ -13,7 +13,7 @@ import java.util.Map;
 public class ResourceConstantHelper {
     public static final String INTERNAL_R_FILENAME = "com_android_internal_R";
     public static String getCompatibleAPILevelFile(int iLevel) {
-        String GatorRootPath = System.getenv("GatorRoot");
+        String GatorRootPath = Configs.gatorRoot;
         if (GatorRootPath == null || GatorRootPath.isEmpty()) {
             System.exit(-1);
         }
