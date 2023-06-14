@@ -190,7 +190,10 @@ class DefaultXMLParser extends AbstractXMLParser {
 	}
 
 	private void readPublicXML() {
-		String fn = Configs.resourceLocation + "/values/public.xml";
+		String fn = Configs.resourceLocation + "/public.xml";
+		if (!(new File(fn).exists())) {
+			fn = Configs.resourceLocation + "/values/public.xml";
+		}
 		DocumentBuilderFactory dbFactory = DocumentBuilderFactory.newInstance();
 		try {
 			DocumentBuilder dBuilder = dbFactory.newDocumentBuilder();
@@ -728,7 +731,14 @@ class DefaultXMLParser extends AbstractXMLParser {
 					} else if (layoutTxt.matches("@\\*android:layout\\/(\\w)+")) {
 						layoutId = layoutTxt.substring("@*android:layout/".length());
 					} else {
-						throw new RuntimeException("[WARNING] Unhandled layout id " + layoutTxt);
+						if (intFromHex(layoutTxt) > 0) {
+							layoutId = lookupNameInGeneralMap("layout", intFromHex(layoutTxt), false);
+							if (layoutId == null) {
+								layoutId = lookupNameInGeneralMap("layout", intFromHex(layoutTxt), true);
+							}
+						} else {
+							throw new RuntimeException("[WARNING] Unhandled layout id " + layoutTxt);
+						}
 					}
 					Integer includeeId = null;
 					id = null;
@@ -872,6 +882,18 @@ class DefaultXMLParser extends AbstractXMLParser {
 		return null;
 	}
 
+	static int intFromHex(String input) {
+		if (input.length() < 1) {
+			return -1;
+		}
+		input = input.substring(1);
+		try {
+			return Integer.parseInt(input, 16);
+		} catch (NumberFormatException ignored) {
+			return -1;
+		}
+	}
+
 	private Pair<String, Integer> parseAndroidId(String txt, boolean isSys) {
 		String id = null;
 		Integer guiIdObj = null;
@@ -881,9 +903,8 @@ class DefaultXMLParser extends AbstractXMLParser {
 		} else if (txt.startsWith("@id/android:")) {
 			id = txt.substring(12);
 			guiIdObj = lookupIdInGeneralMap("id", id, true);
-		} else if (txt.startsWith("@+id/android:") || txt.startsWith("@+android:id/")) { // handle
-			// old
-			// code
+		} else if (txt.startsWith("@+id/android:") || txt.startsWith("@+android:id/")) {
+			// handle old code
 			id = txt.substring(13);
 			guiIdObj = lookupIdInGeneralMap("id", id, true);
 		} else if (txt.startsWith("@+id")) {
@@ -912,16 +933,22 @@ class DefaultXMLParser extends AbstractXMLParser {
 			String type = txt.substring(idxOfColon + 1, idxOfSlash);
 			id = txt.substring(idxOfSlash + 1);
 			guiIdObj = lookupIdInGeneralMap(type, id, true);
+		} else if (txt.matches("@android:(\\S){8}")) {
+			guiIdObj = intFromHex(txt.substring(8));
+			id = lookupNameInGeneralMap(guiIdObj, isSys=true);
 		} else if (txt.matches("@(\\w)+\\/(\\w)+")) {
 			int idxOfSlash = txt.indexOf("/");
 			String type = txt.substring(1, idxOfSlash);
 			id = txt.substring(idxOfSlash + 1);
 			guiIdObj = lookupIdInGeneralMap(type, id, isSys);
 			// Logger.verb("parseAndroidId", "general match at " + txt);
+		} else if (intFromHex(txt) > 0) {
+			guiIdObj = intFromHex(txt);
+			id =lookupNameInGeneralMap(guiIdObj, isSys);
 		} else {
 			throw new RuntimeException("[WARNING] Unhandled android:id prefix " + txt);
 		}
-		return new Pair<String, Integer>(id, guiIdObj);
+		return new Pair<>(id, guiIdObj);
 	}
 
 	// --- END
@@ -929,15 +956,11 @@ class DefaultXMLParser extends AbstractXMLParser {
 	// --- read menu*/*.xml
 	private void readMenu() {
 		readMenu(Configs.resourceLocation + "/", invRGeneralIdMap.get("menu"), id2View, false);
-		// readMenuApplicationProject(invRMenuMap, id2View);
 		readMenu(Configs.sysProj + "/res/", invSysRGeneralIdMap.get("menu"), sysId2View, true);
 	}
 
 	private void readMenu(String resRoot, HashMap<Integer, String> map, HashMap<Integer, AndroidView> viewMap,
 						  boolean isSys) {
-		// boolean isSys = (map == invSysRMenuMap);
-		// assert proj.equals(Configs.project) ^ isSys;
-
 		for (Map.Entry<Integer, String> e : map.entrySet()) {
 			Integer val = e.getKey();
 			String name = e.getValue();
