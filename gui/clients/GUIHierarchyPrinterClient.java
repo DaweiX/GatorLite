@@ -44,11 +44,13 @@ public class GUIHierarchyPrinterClient {
 
         // Init the file io
         try {
-            String path = Paths.get(Configs.outFile, Configs.benchmarkName,
+            String path = Paths.get(
+                    Configs.outFile,
+                    Configs.benchmarkName.replace(".apk", ""),
                     "event.xml").toAbsolutePath().toString();
+            System.out.printf("Out file: %s%n", path);
             File file = new File(path);
-            boolean create = file.createNewFile();
-            System.out.printf("Out file: %s (%s)%n", file, create);
+            boolean ignored = file.createNewFile();
             out = new PrintStream(file);
         } catch (Exception e) {
             throw new RuntimeException(e);

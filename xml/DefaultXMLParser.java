@@ -56,6 +56,8 @@ class DefaultXMLParser extends AbstractXMLParser {
 		return lookupNameInGeneralMap("layout", value, true);
 	}
 
+	private static final boolean FLOW_DROID_LAYOUT = true;
+
 	@Override
 	public AndroidView findViewById(Integer id) {
 		AndroidView res = id2View.get(id);
@@ -450,9 +452,9 @@ class DefaultXMLParser extends AbstractXMLParser {
 	// --- END
 
 	// --- read layout files
-	private static final String ID_ATTR = "android:id";
-	private static final String TEXT_ATTR = "android:text";
-	private static final String TITLE_ATTR = "android:title";
+	private static final String ID_ATTR = FLOW_DROID_LAYOUT? "id": "android:id";
+	private static final String TEXT_ATTR =  FLOW_DROID_LAYOUT? "text": "android:text";
+	private static final String TITLE_ATTR =  FLOW_DROID_LAYOUT? "title": "android:title";
 
 	private static int nonRId = -0x7f040000;
 
@@ -640,7 +642,7 @@ class DefaultXMLParser extends AbstractXMLParser {
 		}
 
 		LinkedList<Pair<Node, AndroidView>> work = Lists.newLinkedList();
-		work.add(new Pair<Node, AndroidView>(rootElement, root));
+		work.add(new Pair<>(rootElement, root));
 		while (!work.isEmpty()) {
 			Pair<Node, AndroidView> p = work.removeFirst();
 			Node node = p.getO1();
@@ -650,7 +652,7 @@ class DefaultXMLParser extends AbstractXMLParser {
 			NamedNodeMap attrMap = node.getAttributes();
 			if (attrMap == null) {
 				System.out.println(
-						file + "!!!" + node.getClass() + "!!!" + node.toString() + "!!!" + node.getTextContent());
+						file + "!!!" + node.getClass() + "!!!" + node + "!!!" + node.getTextContent());
 			}
 			// Retrieve view id (android:id)
 			Node idNode = attrMap.getNamedItem(ID_ATTR);
@@ -666,7 +668,7 @@ class DefaultXMLParser extends AbstractXMLParser {
 						System.err.println("[WARNING] unresolved android:id " + id + " in " + file);
 					}
 				} else {
-					guiId = guiIdObj.intValue();
+					guiId = guiIdObj;
 					if (lookupNameInGeneralMap("id", guiId, isSys) == null) {
 						extraId2ViewMap.put(guiIdObj, view);
 					}
@@ -720,10 +722,10 @@ class DefaultXMLParser extends AbstractXMLParser {
 					System.err.println("[WARNING] no attribute node " + newNode.getNodeName());
 				}
 
-				if (newNode.getNodeName().equals("include")) {
+				if (newNode.getNodeName().equals("include") && !FLOW_DROID_LAYOUT) {
 					attrMap = newNode.getAttributes();
 					String layoutTxt = attrMap.getNamedItem("layout").getTextContent();
-					String layoutId = null;
+					String layoutId;
 					if (layoutTxt.startsWith("@layout/")) {
 						layoutId = layoutTxt.substring("@layout/".length());
 					} else if (layoutTxt.startsWith("@android:layout/")) {
@@ -740,8 +742,7 @@ class DefaultXMLParser extends AbstractXMLParser {
 							throw new RuntimeException("[WARNING] Unhandled layout id " + layoutTxt);
 						}
 					}
-					Integer includeeId = null;
-					id = null;
+					Integer includeId = null;
 					idNode = attrMap.getNamedItem(ID_ATTR);
 					if (idNode != null) {
 						String txt = idNode.getTextContent();
@@ -753,17 +754,17 @@ class DefaultXMLParser extends AbstractXMLParser {
 								System.err.println("[WARNING] unresolved android:id " + id + " in " + file);
 							}
 						} else {
-							includeeId = guiIdObj;
+							includeId = guiIdObj;
 						}
 					}
 
-					// view.saveInclude(layoutId, includeeId);
-					IncludeAndroidView iav = new IncludeAndroidView(layoutId, includeeId);
+					// view.saveInclude(layoutId, includeId);
+					IncludeAndroidView iav = new IncludeAndroidView(layoutId, includeId);
 					iav.setParent(view);
 				} else {
 					AndroidView newView = new AndroidView();
 					newView.setParent(view);
-					work.add(new Pair<Node, AndroidView>(newNode, newView));
+					work.add(new Pair<>(newNode, newView));
 				}
 			}
 		}
@@ -883,7 +884,7 @@ class DefaultXMLParser extends AbstractXMLParser {
 	}
 
 	static int intFromHex(String input) {
-		if (input.length() < 1) {
+		if (input.isEmpty()) {
 			return -1;
 		}
 		input = input.substring(1);
@@ -895,9 +896,9 @@ class DefaultXMLParser extends AbstractXMLParser {
 	}
 
 	private Pair<String, Integer> parseAndroidId(String txt, boolean isSys) {
-		String id = null;
-		Integer guiIdObj = null;
-		if ("@+android:id/internalEmpty".equals(txt)) {
+		String id;
+		Integer guiIdObj;
+	    if ("@+android:id/internalEmpty".equals(txt)) {
 			id = "internalEmpty";
 			guiIdObj = lookupIdInGeneralMap("id", id, true);
 		} else if (txt.startsWith("@id/android:")) {
@@ -946,7 +947,13 @@ class DefaultXMLParser extends AbstractXMLParser {
 			guiIdObj = intFromHex(txt);
 			id =lookupNameInGeneralMap(guiIdObj, isSys);
 		} else {
-			throw new RuntimeException("[WARNING] Unhandled android:id prefix " + txt);
+			try {
+				guiIdObj = Integer.parseInt(txt);
+				id =lookupNameInGeneralMap(guiIdObj, isSys);
+			} catch (Exception e) {
+				throw new RuntimeException(String.format("[ERROR] Unhandled " +
+						"android:id prefix %s.%n%s%n", txt, e.toString()));
+			}
 		}
 		return new Pair<>(id, guiIdObj);
 	}
@@ -1011,11 +1018,10 @@ class DefaultXMLParser extends AbstractXMLParser {
 			throw new RuntimeException(ex);
 		}
 
-		LinkedList<Pair<Node, AndroidView>> worklist = Lists.newLinkedList();
-		worklist.add(new Pair<Node, AndroidView>(doc.getDocumentElement(), root));
-		root = null;
-		while (!worklist.isEmpty()) {
-			Pair<Node, AndroidView> pair = worklist.remove();
+		LinkedList<Pair<Node, AndroidView>> workList = Lists.newLinkedList();
+		workList.add(new Pair<>(doc.getDocumentElement(), root));
+        while (!workList.isEmpty()) {
+			Pair<Node, AndroidView> pair = workList.remove();
 			Node node = pair.getO1();
 			AndroidView view = pair.getO2();
 			NamedNodeMap attrMap = node.getAttributes();
@@ -1043,7 +1049,7 @@ class DefaultXMLParser extends AbstractXMLParser {
 					// invRIdMap.put(guiId, id);
 					// }
 				} else {
-					guiId = guiIdObj.intValue();
+					guiId = guiIdObj;
 				}
 			}
 
@@ -1094,7 +1100,7 @@ class DefaultXMLParser extends AbstractXMLParser {
 					}
 				}
 				newView.setParent(view);
-				worklist.add(new Pair<Node, AndroidView>(newNode, newView));
+				workList.add(new Pair<Node, AndroidView>(newNode, newView));
 			}
 		}
 	}
