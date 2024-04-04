@@ -116,7 +116,7 @@ public class PrerunXMLParser {
       DocumentBuilder dBuilder = dbFactory.newDocumentBuilder();
       doc = dBuilder.parse(file);
     } catch (Exception ex) {
-      throw new RuntimeException(ex);
+      return;
     }
 
     Element rootElement = doc.getDocumentElement();
