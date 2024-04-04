@@ -631,7 +631,7 @@ class DefaultXMLParser extends AbstractXMLParser {
 			DocumentBuilder dBuilder = dbFactory.newDocumentBuilder();
 			doc = dBuilder.parse(file);
 		} catch (Exception ex) {
-			throw new RuntimeException(ex);
+			return;
 		}
 
 		Element rootElement = doc.getDocumentElement();
@@ -1015,7 +1015,7 @@ class DefaultXMLParser extends AbstractXMLParser {
 			DocumentBuilder dBuilder = dbFactory.newDocumentBuilder();
 			doc = dBuilder.parse(file);
 		} catch (Exception ex) {
-			throw new RuntimeException(ex);
+			return;
 		}
 
 		LinkedList<Pair<Node, AndroidView>> workList = Lists.newLinkedList();
