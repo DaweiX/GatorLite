@@ -113,7 +113,7 @@ public class Main {
         for (String s : Configs.depJars) {
             classpathBuffer.append(sep).append(s);
         }
-        if (Configs.jre.length() > 0) {
+        if (!Configs.jre.isEmpty()) {
             classpathBuffer.append(":").append(Configs.jre);
         }
 
@@ -126,6 +126,7 @@ public class Main {
         return classpathBuffer.toString();
     }
 
+    @SuppressWarnings("SpellCheckingInspection")
     static void setupAndInvokeSoot() {
         String classpath = computeClasspath();
         // set up an artificial phase to call into our analysis entrypoint. We can

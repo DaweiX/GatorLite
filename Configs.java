@@ -26,7 +26,6 @@ public class Configs {
 
   // root of the project directory
   public static String project;
-  public static boolean apkMode;
 
   // location of AndroidMainifest file
   public static String manifestLocation;
@@ -198,7 +197,6 @@ public class Configs {
   }
 
   static void apkModeProcessing() {
-    apkMode = true;
     bytecodes = project;
 
     sysProj = Configs.sdkDir + "/platforms/" + Configs.apiLevel + "/data";

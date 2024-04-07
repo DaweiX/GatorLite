@@ -12,7 +12,6 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import soot.Scene;
 import soot.SootClass;
-import soot.toolkits.scalar.Pair;
 
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -22,11 +21,6 @@ import java.util.Set;
 public interface XMLParser {
   abstract class AbstractXMLParser implements XMLParser {
     Map<String, ActivityLaunchMode> activityAndLaunchModes = Maps.newHashMap();
-
-    @Override
-    public ActivityLaunchMode getLaunchMode(String activityClassName) {
-      return activityAndLaunchModes.get(activityClassName);
-    }
 
     protected String appPkg;
 
@@ -45,15 +39,6 @@ public interface XMLParser {
       return activities.iterator();
     }
 
-    @Override
-    public int getNumberOfActivities() {
-      return activities.size();
-    }
-
-    @Override
-    public String getAppPackageName() {
-      return appPkg;
-    }
   }
 
   class Helper {
@@ -65,8 +50,7 @@ public interface XMLParser {
         classNameFromXml = appPkg + "." + classNameFromXml;
       }
       if (Scene.v().getSootClass(classNameFromXml).isPhantom()) {
-        System.out.println("[WARNING] : "+ classNameFromXml +
-                " is declared in AndroidManifest.xml, but phantom.");
+        // WARNING: classNameFromXml is declared in manifest, but phantom
         return null;
       }
       return classNameFromXml;
@@ -78,74 +62,61 @@ public interface XMLParser {
       return DefaultXMLParser.v();
     }
   }
-  // === layout, id, string, menu xml files
+  // layout, id, string, menu xml files
 
   // R.layout.*
-  public Set<Integer> getApplicationLayoutIdValues();
+  Set<Integer> getApplicationLayoutIdValues();
 
-  public Set<Integer> getSystemLayoutIdValues();
+  Set<Integer> getSystemLayoutIdValues();
 
-  public Integer getSystemRLayoutValue(String layoutName);
+  Integer getSystemRLayoutValue(String layoutName);
 
-  public String getApplicationRLayoutName(Integer value);
+  String getApplicationRLayoutName(Integer value);
 
-  public String getSystemRLayoutName(Integer value);
+  String getSystemRLayoutName(Integer value);
 
   // R.menu.*
-  public Set<Integer> getApplicationMenuIdValues();
+  Set<Integer> getApplicationMenuIdValues();
 
-  public Set<Integer> getSystemMenuIdValues();
+  Set<Integer> getSystemMenuIdValues();
 
-  public String getApplicationRMenuName(Integer value);
+  String getApplicationRMenuName(Integer value);
 
-  public String getSystemRMenuName(Integer value);
+  String getSystemRMenuName(Integer value);
 
   // R.id.*
-  public Set<Integer> getApplicationRIdValues();
+  Set<Integer> getApplicationRIdValues();
 
-  public Set<Integer> getSystemRIdValues();
+  Set<Integer> getSystemRIdValues();
 
-  public Integer getSystemRIdValue(String idName);
+  Integer getSystemRIdValue(String idName);
 
-  public String getApplicationRIdName(Integer value);
+  String getApplicationRIdName(Integer value);
 
-  public String getSystemRIdName(Integer value);
+  String getSystemRIdName(Integer value);
 
   // R.string.*
-  public Set<Integer> getStringIdValues();
+  Set<Integer> getStringIdValues();
 
-  public String getRStringName(Integer value);
+  String getRStringName(Integer value);
 
-  public String getStringValue(Integer idValue);
+  String getStringValue(Integer idValue);
 
   // R.drawable.*
-  public Set<Integer> getDrawableIdValues();
+  Set<Integer> getDrawableIdValues();
 
-  // === AndroidManifest.xml
-  public SootClass getMainActivity();
+  // AndroidManifest.xml
+  SootClass getMainActivity();
 
-  public Iterator<String> getActivities();
+  Iterator<String> getActivities();
 
-  public Iterator<String> getServices();
-
-  public int getNumberOfActivities();
-
-  public String getAppPackageName();
-
-  public enum ActivityLaunchMode {
+  enum ActivityLaunchMode {
     standard,
     singleTop,
     singleTask,
     singleInstance
   }
 
-  public ActivityLaunchMode getLaunchMode(String activityClassName);
-
-  // === APIs for layout xml files
-
   // Given a view id, find static abstraction of the matched view.
-  public AndroidView findViewById(Integer id);
-
-  // retrieve callbacks defined in xml
-  public Map<Integer, Pair<String, Boolean>> retrieveCallbacks();
+  AndroidView findViewById(Integer id);
 }

@@ -11,21 +11,16 @@ package presto.android.xml;
 class IncludeAndroidView implements IAndroidView {
   public AndroidView parent;
   public String layoutId;
-  public Integer includeeId;
+  public Integer includeId;
 
-  public IncludeAndroidView(String layoutId) {
-    this(layoutId, null);
-  }
-
-  public IncludeAndroidView(String layoutId, Integer includeeId) {
+  public IncludeAndroidView(String layoutId, Integer includeId) {
     this.layoutId = layoutId;
-    this.includeeId = includeeId;
+    this.includeId = includeId;
   }
 
   @Override
   public IAndroidView deepCopy() {
-    IncludeAndroidView ret = new IncludeAndroidView(layoutId, includeeId);
-    return ret;
+      return new IncludeAndroidView(layoutId, includeId);
   }
 
   @Override

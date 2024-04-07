@@ -9,6 +9,7 @@
 package presto.android.xml;
 
 import java.io.File;
+import java.nio.file.Paths;
 import java.util.*;
 
 import javax.xml.parsers.DocumentBuilder;
@@ -32,9 +33,6 @@ import soot.toolkits.scalar.Pair;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 
-/*
- * This is a re-design of the xml parsing component.
- */
 class DefaultXMLParser extends AbstractXMLParser {
 	@Override
 	public Integer getSystemRIdValue(String idName) {
@@ -142,15 +140,6 @@ class DefaultXMLParser extends AbstractXMLParser {
 		return intAndStringValues.get(idValue);
 	}
 
-	@Override
-	public Iterator<String> getServices() {
-		return services.iterator();
-	}
-
-	// ================================================
-
-	private static final boolean debug = false;
-
 	private static DefaultXMLParser theInst;
 
 	private DefaultXMLParser() {
@@ -174,11 +163,7 @@ class DefaultXMLParser extends AbstractXMLParser {
 		readManifest();
 
 		readRFile();
-		// If the XML parser is working in ApkMode,
-		// Read the public.xml as well.
-		if (Configs.apkMode) {
-			readPublicXML();
-		}
+		readPublicXML();
 
 		// Strings must be read first
 		readStrings();
@@ -186,9 +171,6 @@ class DefaultXMLParser extends AbstractXMLParser {
 		// Then, layout and menu. Later, we may need to read preference as well.
 		readLayout();
 		readMenu();
-
-		// debugPrintAll();
-
 	}
 
 	private void readPublicXML() {
@@ -244,7 +226,7 @@ class DefaultXMLParser extends AbstractXMLParser {
 					String eleName = n.getNodeName();
 					if ("activity".equals(eleName)) {
 						NamedNodeMap m = n.getAttributes();
-						String cls = Helper.getClassName(m.getNamedItem("android:name").getTextContent(), appPkg);
+						String cls = Helper.getClassName(m.getNamedItem("name").getTextContent(), appPkg);
 						if (cls == null) {
 							continue;
 						}
@@ -256,7 +238,7 @@ class DefaultXMLParser extends AbstractXMLParser {
 						}
 
 						ActivityLaunchMode launchMode = ActivityLaunchMode.standard;
-						Node launchModeNode = m.getNamedItem("android:launchMode");
+						Node launchModeNode = m.getNamedItem("launchMode");
 						if (launchModeNode != null) {
 							launchMode = ActivityLaunchMode.valueOf(launchModeNode.getTextContent());
 						}
@@ -265,17 +247,16 @@ class DefaultXMLParser extends AbstractXMLParser {
 
 					if ("service".equals(eleName)) {
 						NamedNodeMap m = n.getAttributes();
-						String partialClassName = m.getNamedItem("android:name").getTextContent();
-
+						String partialClassName = m.getNamedItem("name").getTextContent();
 						String cls = Helper.getClassName(partialClassName, appPkg);
 						services.add(cls);
 					}
 				} catch (NullPointerException ne) {
-					// A work around for uk.co.busydoingnothing.catverbs_5.apk
-					Logger.verb("ERROR",
-							"Nullpointer Exception in readManifest maybe caused by " + "customized namespace");
+					System.out.println("[MANIFEST] read manifest error");
 				}
 			}
+			System.out.printf("[MANIFEST] add %s new activity class and %s new service class%n",
+					activities.size(), services.size());
 		} catch (RuntimeException e) {
 			throw e;
 		} catch (Exception ex) {
@@ -309,13 +290,13 @@ class DefaultXMLParser extends AbstractXMLParser {
 			String s = n.getNodeName();
 			if ("action".equals(s)) {
 				NamedNodeMap m = n.getAttributes();
-				String action = m.getNamedItem("android:name").getTextContent();
+				String action = m.getNamedItem("name").getTextContent();
 				if ("android.intent.action.MAIN".equals(action)) {
 					isMain = true;
 				}
 			} else if ("category".equals(s)) {
 				NamedNodeMap m = n.getAttributes();
-				String category = m.getNamedItem("android:name").getTextContent();
+				String category = m.getNamedItem("name").getTextContent();
 				if ("android.intent.category.LAUNCHER".equals(category)) {
 					isLauncher = true;
 				}
@@ -338,12 +319,9 @@ class DefaultXMLParser extends AbstractXMLParser {
 	private final HashMap<Integer, String> sysIntAndStringValues = Maps.newHashMap();
 	private final HashMap<String, String> sysRStringAndStringValues = Maps.newHashMap();
 
-	private HashMap<Integer, AndroidView> extraId2ViewMap = Maps.newHashMap();
+	private final HashMap<Integer, AndroidView> extraId2ViewMap = Maps.newHashMap();
 
 	public void feedIdIntoGeneralMap(String type, String name, Integer value, boolean isSys) {
-		assert type != null;
-		assert name != null;
-		assert value != null;
 		HashMap<String, Integer> workingMap;
 		HashMap<Integer, String> invWorkingMap;
 		if (isSys) {
@@ -366,8 +344,6 @@ class DefaultXMLParser extends AbstractXMLParser {
 			invWorkingMap = invRGeneralIdMap.get(type);
 		}
 
-		assert workingMap != null;
-		assert invWorkingMap != null;
 		workingMap.put(name, value);
 		invWorkingMap.put(value, name);
 	}
@@ -418,8 +394,7 @@ class DefaultXMLParser extends AbstractXMLParser {
 			}
 		}
 
-		final String internalSysRIdClass = "com.android.internal.R$id";
-		// We are not going to rely on android.jar built from AOSP.
+        // We are not going to rely on android.jar built from AOSP.
 		// So read our own internal const files.
 		ResourceConstantHelper.loadConstFromFile(this);
 	}
@@ -429,10 +404,6 @@ class DefaultXMLParser extends AbstractXMLParser {
 		// This particular R$* class is not used. Should be system R class
 		// though.
 		if (idCls.isPhantom()) {
-			// if (Configs.verbose) {
-			if (true) {
-				System.out.println("[DEBUG] " + clsName + " is phantom!");
-			}
 			return;
 		}
 
@@ -449,8 +420,6 @@ class DefaultXMLParser extends AbstractXMLParser {
 		}
 	}
 
-	// --- END
-
 	// --- read layout files
 	private static final String ID_ATTR = FLOW_DROID_LAYOUT? "id": "android:id";
 	private static final String TEXT_ATTR =  FLOW_DROID_LAYOUT? "text": "android:text";
@@ -463,16 +432,12 @@ class DefaultXMLParser extends AbstractXMLParser {
 
 	private void readLayout() {
 		id2View = Maps.newHashMap();
-		readLayout(Configs.resourceLocation + "/", invRGeneralIdMap.get("layout"), id2View, false);
-		// readLayoutApplicationProject(invRLayoutMap, id2View);
-
+		readLayout(Paths.get(Configs.resourceLocation).toString(), invRGeneralIdMap.get("layout"), id2View, false);
 		sysId2View = Maps.newHashMap();
-		readLayout(Configs.sysProj + "/res/", invSysRGeneralIdMap.get("layout"), sysId2View, true);
+		readLayout(Paths.get(Configs.sysProj, "res").toString(), invSysRGeneralIdMap.get("layout"), sysId2View, true);
 
-		resolveIncludes(Configs.sysProj + "/res/", invSysRGeneralIdMap.get("layout"), sysId2View, true);
-		resolveIncludes(Configs.resourceLocation + "/", invRGeneralIdMap.get("layout"), id2View, false);
-		// resolveIncludesApplicationProject(invRLayoutMap, id2View);
-
+		resolveIncludes(Paths.get(Configs.sysProj, "res").toString(), invSysRGeneralIdMap.get("layout"), sysId2View, true);
+		resolveIncludes(Paths.get(Configs.resourceLocation).toString(), invRGeneralIdMap.get("layout"), id2View, false);
 	}
 
 	// TODO: due to the way we implement resolveIncludes(), now we need
@@ -522,73 +487,17 @@ class DefaultXMLParser extends AbstractXMLParser {
 					System.err.println("[WARNING] Unknown layout " + layoutId + " included by " + view.getOrigin());
 					continue;
 				}
-				Integer includeeId = iav.includeeId;
-				if (includeeId != null) {
-					tgt.setId(includeeId.intValue());
+				Integer includeId = iav.includeId;
+				if (includeId != null) {
+					tgt.setId(includeId);
 				}
 				work.add(tgt);
 			}
 		}
 	}
 
-	private void resolveIncludesApplicationProject(HashMap<Integer, String> nameMap,
-												   HashMap<Integer, AndroidView> viewMap) {
-
-		HashMap<String, AndroidView> name2View = Maps.newHashMap();
-		for (Map.Entry<Integer, String> entry : nameMap.entrySet()) {
-			String name = entry.getValue();
-			AndroidView view = viewMap.get(entry.getKey());
-			name2View.put(name, view);
-		}
-		boolean isSys = false;
-		LinkedList<AndroidView> work = Lists.newLinkedList();
-		work.addAll(viewMap.values());
-		while (!work.isEmpty()) {
-			AndroidView view = work.remove();
-			for (int i = 0; i < view.getNumberOfChildren(); i++) {
-				IAndroidView child = view.getChildInternal(i);
-				if (child instanceof AndroidView) {
-					work.add((AndroidView) child);
-					continue;
-				}
-				IncludeAndroidView iav = (IncludeAndroidView) child;
-				String layoutId = iav.layoutId;
-				AndroidView tgt = name2View.get(layoutId);
-				if (tgt == null) {
-					// not exist, let's get it on-demand
-					String file = getLayoutFilePath(Configs.resourceLocation, layoutId, isSys);
-					if (file == null) {
-						System.err.println("[WARNING] Unknown layout " + layoutId + " included by " + view.getOrigin());
-						continue;
-					}
-					tgt = new AndroidView();
-					tgt.setParent(view, i);
-					tgt.setOrigin(file);
-					readLayout(file, tgt, isSys);
-					int newId = nonRId--;
-					viewMap.put(newId, tgt);
-					nameMap.put(newId, layoutId);
-				} else {
-					tgt = (AndroidView) tgt.deepCopy();
-					tgt.setParent(view, i);
-				}
-				Integer includeeId = iav.includeeId;
-				if (includeeId != null) {
-					tgt.setId(includeeId.intValue());
-				}
-				work.add(tgt);
-			}
-		}
-	}
-
-	private void readLayout(String resRoot, HashMap<Integer, String> in, HashMap<Integer, AndroidView> out,
-							boolean isSys) {
-		if (debug) {
-			System.out.println("*** read layout of " + resRoot);
-		}
-		// boolean isSys = (invSysRLayoutMap == in);
-		// assert Configs.project.equals(proj) ^ isSys;
-
+	private void readLayout(String resRoot, HashMap<Integer, String> in,
+							HashMap<Integer, AndroidView> out, boolean isSys) {
 		for (Map.Entry<Integer, String> entry : in.entrySet()) {
 			Integer layoutFileId = entry.getKey();
 			String layoutFileName = entry.getValue();
@@ -604,26 +513,6 @@ class DefaultXMLParser extends AbstractXMLParser {
 		}
 	}
 
-	private void readLayoutApplicationProject(HashMap<Integer, String> in, HashMap<Integer, AndroidView> out) {
-		if (debug) {
-			System.out.println("*** read layout of " + Configs.project);
-		}
-
-		for (Map.Entry<Integer, String> entry : in.entrySet()) {
-			Integer layoutFileId = entry.getKey();
-			String layoutFileName = entry.getValue();
-			AndroidView root = new AndroidView();
-			out.put(layoutFileId, root);
-
-			String file = getLayoutFilePath(Configs.resourceLocation, layoutFileName, false);
-			if (file == null) {
-				continue;
-			}
-
-			readLayout(file, root, false);
-		}
-	}
-
 	private void readLayout(String file, AndroidView root, boolean isSys) {
 		Document doc;
 		try {
@@ -631,12 +520,10 @@ class DefaultXMLParser extends AbstractXMLParser {
 			DocumentBuilder dBuilder = dbFactory.newDocumentBuilder();
 			doc = dBuilder.parse(file);
 		} catch (Exception ex) {
-			return;
+			throw new RuntimeException(ex);
 		}
 
 		Element rootElement = doc.getDocumentElement();
-		// In older versions, Preference could be put in layout folder and we do
-		// not support Prefernce yet.
 		if (rootElement.getTagName().equals("PreferenceScreen")) {
 			return;
 		}
@@ -650,14 +537,10 @@ class DefaultXMLParser extends AbstractXMLParser {
 			view.setOrigin(file);
 
 			NamedNodeMap attrMap = node.getAttributes();
-			if (attrMap == null) {
-				System.out.println(
-						file + "!!!" + node.getClass() + "!!!" + node + "!!!" + node.getTextContent());
-			}
 			// Retrieve view id (android:id)
 			Node idNode = attrMap.getNamedItem(ID_ATTR);
 			int guiId = -1;
-			String id = null;
+			String id;
 			if (idNode != null) {
 				String txt = idNode.getTextContent();
 				Pair<String, Integer> pair = parseAndroidId(txt, isSys);
@@ -669,7 +552,8 @@ class DefaultXMLParser extends AbstractXMLParser {
 					}
 				} else {
 					guiId = guiIdObj;
-					if (lookupNameInGeneralMap("id", guiId, isSys) == null) {
+					String id1 = lookupNameInGeneralMap("id", guiId, isSys);
+					if (id1 == null) {
 						extraId2ViewMap.put(guiIdObj, view);
 					}
 				}
@@ -684,15 +568,12 @@ class DefaultXMLParser extends AbstractXMLParser {
 				guiName = "android.view.MenuItem";
 			}
 
-			if (debug) {
-				System.out.println(guiName + " (" + guiId + ", " + id + ")");
-			}
-
 			// Retrieve callback (android:onClick)
 			if (guiId != -1) {
-				String callback = readAndroidCallback(attrMap, "android:onClick");
+				String cb = "android:onClick";
+				String callback = readAndroidCallback(attrMap, cb);
 				if (callback != null) {
-					Pair<String, Boolean> pair = new Pair<String, Boolean>(callback, false);
+					Pair<String, Boolean> pair = new Pair<>(callback, false);
 					this.callbacksXML.put(guiId, pair);
 				}
 			}
@@ -722,7 +603,7 @@ class DefaultXMLParser extends AbstractXMLParser {
 					System.err.println("[WARNING] no attribute node " + newNode.getNodeName());
 				}
 
-				if (newNode.getNodeName().equals("include") && !FLOW_DROID_LAYOUT) {
+				if (newNode.getNodeName().equals("include")) {
 					attrMap = newNode.getAttributes();
 					String layoutTxt = attrMap.getNamedItem("layout").getTextContent();
 					String layoutId;
@@ -730,18 +611,20 @@ class DefaultXMLParser extends AbstractXMLParser {
 						layoutId = layoutTxt.substring("@layout/".length());
 					} else if (layoutTxt.startsWith("@android:layout/")) {
 						layoutId = layoutTxt.substring("@android:layout/".length());
-					} else if (layoutTxt.matches("@\\*android:layout\\/(\\w)+")) {
+					} else if (layoutTxt.matches("@\\*android:layout/(\\w)+")) {
 						layoutId = layoutTxt.substring("@*android:layout/".length());
 					} else {
-						if (intFromHex(layoutTxt) > 0) {
-							layoutId = lookupNameInGeneralMap("layout", intFromHex(layoutTxt), false);
+						try {
+							int intId = Integer.parseInt(layoutTxt);
+							layoutId = lookupNameInGeneralMap("layout", intId, false);
 							if (layoutId == null) {
-								layoutId = lookupNameInGeneralMap("layout", intFromHex(layoutTxt), true);
+								layoutId = lookupNameInGeneralMap("layout", intId, true);
 							}
-						} else {
+						} catch (NumberFormatException e) {
 							throw new RuntimeException("[WARNING] Unhandled layout id " + layoutTxt);
 						}
 					}
+
 					Integer includeId = null;
 					idNode = attrMap.getNamedItem(ID_ATTR);
 					if (idNode != null) {
@@ -758,7 +641,7 @@ class DefaultXMLParser extends AbstractXMLParser {
 						}
 					}
 
-					// view.saveInclude(layoutId, includeId);
+					// System.out.printf("[XMLParser] layout %s includes %s%n", includeId, layoutId);
 					IncludeAndroidView iav = new IncludeAndroidView(layoutId, includeId);
 					iav.setParent(view);
 				} else {
@@ -817,11 +700,7 @@ class DefaultXMLParser extends AbstractXMLParser {
 		if (node == null) {
 			return null;
 		}
-		String refOrValue = node.getTextContent();
-		if (debug) {
-			System.out.println("  * `" + refOrValue + "' -> `" + refOrValue + "'");
-		}
-		return refOrValue;
+        return node.getTextContent();
 	}
 
 	private Integer lookupIdInGeneralMap(String type, String name, boolean isSys) {
@@ -843,8 +722,9 @@ class DefaultXMLParser extends AbstractXMLParser {
 	}
 
 	private String lookupNameInGeneralMap(String type, Integer val, boolean isSys) {
-		assert type != null;
-		assert val != null;
+		if (type == null || val == null) {
+			return null;
+		}
 		HashMap<String, HashMap<Integer, String>> workingMap;
 		if (isSys) {
 			workingMap = invSysRGeneralIdMap;
@@ -852,7 +732,9 @@ class DefaultXMLParser extends AbstractXMLParser {
 			workingMap = invRGeneralIdMap;
 		}
 
-		assert workingMap != null;
+		if (workingMap == null) {
+			return null;
+		}
 		HashMap<Integer, String> workingIdMap = workingMap.get(type);
 		if (workingIdMap == null) {
 			return null;
@@ -887,7 +769,9 @@ class DefaultXMLParser extends AbstractXMLParser {
 		if (input.isEmpty()) {
 			return -1;
 		}
-		input = input.substring(1);
+		if (input.startsWith("@")) {
+			input = input.substring(1);
+		}
 		try {
 			return Integer.parseInt(input, 16);
 		} catch (NumberFormatException ignored) {
@@ -898,67 +782,65 @@ class DefaultXMLParser extends AbstractXMLParser {
 	private Pair<String, Integer> parseAndroidId(String txt, boolean isSys) {
 		String id;
 		Integer guiIdObj;
-	    if ("@+android:id/internalEmpty".equals(txt)) {
-			id = "internalEmpty";
-			guiIdObj = lookupIdInGeneralMap("id", id, true);
-		} else if (txt.startsWith("@id/android:")) {
-			id = txt.substring(12);
-			guiIdObj = lookupIdInGeneralMap("id", id, true);
-		} else if (txt.startsWith("@+id/android:") || txt.startsWith("@+android:id/")) {
-			// handle old code
-			id = txt.substring(13);
-			guiIdObj = lookupIdInGeneralMap("id", id, true);
-		} else if (txt.startsWith("@+id")) {
-			id = txt.substring(5);
-			guiIdObj = lookupIdInGeneralMap("id", id, isSys);
-		} else if (txt.startsWith("@id/")) {
-			id = txt.substring(4);
-			guiIdObj = lookupIdInGeneralMap("id", id, isSys);
-		} else if (txt.startsWith("@android:id")) {
-			id = txt.substring(12);
-			// guiIdObj = sysRIdMap.get(id);
-			guiIdObj = lookupIdInGeneralMap("id", id, true);
-		} else if (txt.startsWith("@android:attr/")) {
-			id = txt.substring(14);
-			// guiIdObj = sysRIdMap.get(id);
-			guiIdObj = lookupIdInGeneralMap("attr", id, true);
-		} else if (txt.matches("@\\*android:(\\w)+\\/(\\w)+")) {
-			int idxOfColon = txt.indexOf(":");
-			int idxOfSlash = txt.indexOf("/");
-			String type = txt.substring(idxOfColon + 1, idxOfSlash);
-			id = txt.substring(idxOfSlash + 1);
-			guiIdObj = lookupIdInGeneralMap(type, id, true);
-		} else if (txt.matches("@android:(\\w)+\\/(\\w)+")) {
-			int idxOfColon = txt.indexOf(":");
-			int idxOfSlash = txt.indexOf("/");
-			String type = txt.substring(idxOfColon + 1, idxOfSlash);
-			id = txt.substring(idxOfSlash + 1);
-			guiIdObj = lookupIdInGeneralMap(type, id, true);
-		} else if (txt.matches("@android:(\\S){8}")) {
-			guiIdObj = intFromHex(txt.substring(8));
-			id = lookupNameInGeneralMap(guiIdObj, isSys=true);
-		} else if (txt.matches("@(\\w)+\\/(\\w)+")) {
-			int idxOfSlash = txt.indexOf("/");
-			String type = txt.substring(1, idxOfSlash);
-			id = txt.substring(idxOfSlash + 1);
-			guiIdObj = lookupIdInGeneralMap(type, id, isSys);
-			// Logger.verb("parseAndroidId", "general match at " + txt);
-		} else if (intFromHex(txt) > 0) {
-			guiIdObj = intFromHex(txt);
+		if (FLOW_DROID_LAYOUT) {
+			guiIdObj = Integer.parseInt(txt);
 			id =lookupNameInGeneralMap(guiIdObj, isSys);
 		} else {
-			try {
-				guiIdObj = Integer.parseInt(txt);
-				id =lookupNameInGeneralMap(guiIdObj, isSys);
-			} catch (Exception e) {
+			if ("@+android:id/internalEmpty".equals(txt)) {
+				id = "internalEmpty";
+				guiIdObj = lookupIdInGeneralMap("id", id, true);
+			} else if (txt.startsWith("@id/android:")) {
+				id = txt.substring(12);
+				guiIdObj = lookupIdInGeneralMap("id", id, true);
+			} else if (txt.startsWith("@+id/android:") || txt.startsWith("@+android:id/")) {
+				// handle old code
+				id = txt.substring(13);
+				guiIdObj = lookupIdInGeneralMap("id", id, true);
+			} else if (txt.startsWith("@+id")) {
+				id = txt.substring(5);
+				guiIdObj = lookupIdInGeneralMap("id", id, isSys);
+			} else if (txt.startsWith("@id/")) {
+				id = txt.substring(4);
+				guiIdObj = lookupIdInGeneralMap("id", id, isSys);
+			} else if (txt.startsWith("@android:id")) {
+				id = txt.substring(12);
+				// guiIdObj = sysRIdMap.get(id);
+				guiIdObj = lookupIdInGeneralMap("id", id, true);
+			} else if (txt.startsWith("@android:attr/")) {
+				id = txt.substring(14);
+				// guiIdObj = sysRIdMap.get(id);
+				guiIdObj = lookupIdInGeneralMap("attr", id, true);
+			} else if (txt.matches("@\\*android:(\\w)+/(\\w)+")) {
+				int idxOfColon = txt.indexOf(":");
+				int idxOfSlash = txt.indexOf("/");
+				String type = txt.substring(idxOfColon + 1, idxOfSlash);
+				id = txt.substring(idxOfSlash + 1);
+				guiIdObj = lookupIdInGeneralMap(type, id, true);
+			} else if (txt.matches("@android:(\\w)+/(\\w)+")) {
+				int idxOfColon = txt.indexOf(":");
+				int idxOfSlash = txt.indexOf("/");
+				String type = txt.substring(idxOfColon + 1, idxOfSlash);
+				id = txt.substring(idxOfSlash + 1);
+				guiIdObj = lookupIdInGeneralMap(type, id, true);
+			} else if (txt.matches("@android:(\\S){8}")) {
+				guiIdObj = intFromHex(txt.substring(8));
+				id = lookupNameInGeneralMap(guiIdObj, true);
+			} else if (txt.matches("@(\\w)+/(\\w)+")) {
+				int idxOfSlash = txt.indexOf("/");
+				String type = txt.substring(1, idxOfSlash);
+				id = txt.substring(idxOfSlash + 1);
+				guiIdObj = lookupIdInGeneralMap(type, id, isSys);
+			} else if (intFromHex(txt) > 0) {
+				guiIdObj = intFromHex(txt);
+				id = lookupNameInGeneralMap(guiIdObj, isSys);
+			} else {
 				throw new RuntimeException(String.format("[ERROR] Unhandled " +
-						"android:id prefix %s.%n%s%n", txt, e.toString()));
+						"android:id %s%n", txt));
 			}
 		}
+		// System.out.printf("[XMLParser] parse id text: %s -> (%s, %s)%n", txt, guiIdObj, id);
 		return new Pair<>(id, guiIdObj);
 	}
-
-	// --- END
 
 	// --- read menu*/*.xml
 	private void readMenu() {
@@ -978,31 +860,6 @@ class DefaultXMLParser extends AbstractXMLParser {
 				continue;
 			}
 			root.setOrigin(file);
-			if (debug) {
-				System.out.println("--- reading " + file);
-			}
-
-			readMenu(file, root, isSys);
-		}
-	}
-
-	private void readMenuApplicationProject(HashMap<Integer, String> map, HashMap<Integer, AndroidView> viewMap) {
-		boolean isSys = false;
-
-		for (Map.Entry<Integer, String> e : map.entrySet()) {
-			Integer val = e.getKey();
-			String name = e.getValue();
-			AndroidView root = new AndroidView();
-			viewMap.put(val, root);
-			String file = getMenuFilePath(Configs.resourceLocation, name, isSys);
-			if (file == null) {
-				System.err.println("Unknown menu " + name + " for " + Configs.project);
-				continue;
-			}
-			root.setOrigin(file);
-			if (debug) {
-				System.out.println("--- reading " + file);
-			}
 
 			readMenu(file, root, isSys);
 		}
@@ -1015,7 +872,7 @@ class DefaultXMLParser extends AbstractXMLParser {
 			DocumentBuilder dBuilder = dbFactory.newDocumentBuilder();
 			doc = dBuilder.parse(file);
 		} catch (Exception ex) {
-			return;
+			throw new RuntimeException(ex);
 		}
 
 		LinkedList<Pair<Node, AndroidView>> workList = Lists.newLinkedList();
@@ -1041,13 +898,6 @@ class DefaultXMLParser extends AbstractXMLParser {
 					// unique id but
 					// we don't know its value
 					feedIdIntoGeneralMap("id", id, guiId, isSys);
-					// if (isSys) {
-					// sysRIdMap.put(id, guiId);
-					// invSysRIdMap.put(guiId, id);
-					// } else {
-					// rIdMap.put(id, guiId);
-					// invRIdMap.put(guiId, id);
-					// }
 				} else {
 					guiId = guiIdObj;
 				}
@@ -1055,19 +905,20 @@ class DefaultXMLParser extends AbstractXMLParser {
 
 			// FIXME(tony): this is an "approximation"
 			String guiName = node.getNodeName();
-			if (guiName.equals("menu")) {
-				guiName = "android.view.Menu";
-			} else if (guiName.equals("item")) {
-				guiName = "android.view.MenuItem";
-			} else if (guiName.equals("group")) {
-				// TODO(tony): we might want to create a special fake class to
-				// represent menu groups. But for now, let's simply pretend it's
-				// a ViewGroup. Also, print a warning when we do see <group>
-				guiName = "android.view.ViewGroup";
-			}
-			if (debug) {
-				System.out.println(guiName + " (" + guiId + ", " + id + ")");
-			}
+            switch (guiName) {
+                case "menu":
+                    guiName = "android.view.Menu";
+                    break;
+                case "item":
+                    guiName = "android.view.MenuItem";
+                    break;
+                case "group":
+                    // TODO(tony): we might want to create a special fake class to
+                    // represent menu groups. But for now, let's simply pretend it's
+                    // a ViewGroup. Also, print a warning when we do see <group>
+                    guiName = "android.view.ViewGroup";
+                    break;
+            }
 			String text = readAndroidTextOrTitle(attrMap, TITLE_ATTR);
 
 			view.save(guiId, text, guiName);
@@ -1107,17 +958,13 @@ class DefaultXMLParser extends AbstractXMLParser {
 
 	private String getMenuFilePath(String project, String menuId, boolean isSys) {
 		ArrayList<String> projectDirs = Lists.newArrayList();
-		// projectDirs.add(project);
+		projectDirs.add(project);
 		if (!isSys) {
 			projectDirs.addAll(Configs.resourceLocationList);
 		}
 
 		for (String proj : projectDirs) {
 			String file = findFileExistence(proj, "menu", menuId + ".xml");
-			/*
-			 * String file = proj + "/res/menu/" + menuId + ".xml"; if (!new
-			 * File(file).exists()) { file = null; }
-			 */
 			if (file != null) {
 				return file;
 			}
@@ -1170,8 +1017,6 @@ class DefaultXMLParser extends AbstractXMLParser {
 			}
 			// Workaround for a weird case in XBMC
 			return null;
-			// throw new RuntimeException("Unknown android:text format " +
-			// androidText);
 		} else {
 			return androidText;
 		}
@@ -1183,9 +1028,6 @@ class DefaultXMLParser extends AbstractXMLParser {
 		if (textNode != null) {
 			String refOrValue = textNode.getTextContent();
 			text = convertAndroidTextToString(refOrValue);
-			if (debug) {
-				System.out.println("  * `" + refOrValue + "' -> `" + text + "'");
-			}
 		}
 		return text;
 	}
@@ -1221,11 +1063,7 @@ class DefaultXMLParser extends AbstractXMLParser {
 			stringFieldAndStrings.put(stringName, stringValue);
 
 			Integer idValueObj = stringFieldAndIds.get(stringName);
-			if (idValueObj == null) {
-				if (debug) {
-					throw new RuntimeException("Unknown string node " + stringName + " defined in " + file);
-				}
-			} else {
+			if (idValueObj != null) {
 				idAndStrings.put(idValueObj, stringValue);
 			}
 		}
@@ -1285,7 +1123,7 @@ class DefaultXMLParser extends AbstractXMLParser {
 				if (subDirName.startsWith(dirName)) {
 					for (File subFile : subFolder.listFiles()) {
 						if (subFile.getName().equals(tgtFileName))
-							return folderName + "/" + subDirName + "/" + tgtFileName;
+							return Paths.get(folderName, subDirName, tgtFileName).toString();
 					}
 				}
 			}
@@ -1294,42 +1132,7 @@ class DefaultXMLParser extends AbstractXMLParser {
 	}
 
 	// record callbacks defined in xml
-	private HashMap<Integer, Pair<String, Boolean>> callbacksXML = new HashMap<Integer, Pair<String, Boolean>>();
-
-	@Override
-	public Map<Integer, Pair<String, Boolean>> retrieveCallbacks() {
-		return callbacksXML;
-	}
-
-	private void printMap(Map theMap, String name) {
-		int iSize = 0;
-		if (theMap != null) {
-			iSize = theMap.size();
-		}
-		System.out.println("[DEBUGXML] Map " + name + "size: " + iSize);
-		if (iSize == 0) {
-			return;
-		}
-		Set<Object> keys = theMap.keySet();
-		for (Object key : keys) {
-			Object value = theMap.get(key);
-			System.out.println(String.format("KEY Type: %s, %s VALUE Type: %s, %s", key.getClass().getSimpleName(),
-					key.toString(), value.getClass().getSimpleName(), value.toString()));
-
-		}
-	}
-
-	public void debugPrintAll() {
-
-		System.out.println("Activities:");
-		for (String str : this.activities) {
-			System.out.println(str);
-		}
-		System.out.println("Services:");
-		for (String str : this.services) {
-			System.out.println(str);
-		}
-	}
+	private final HashMap<Integer, Pair<String, Boolean>> callbacksXML = new HashMap<Integer, Pair<String, Boolean>>();
 
 	@Override
 	public Set<Integer> getDrawableIdValues() {
