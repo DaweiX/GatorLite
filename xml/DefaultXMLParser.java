@@ -240,7 +240,12 @@ class DefaultXMLParser extends AbstractXMLParser {
 						ActivityLaunchMode launchMode = ActivityLaunchMode.standard;
 						Node launchModeNode = m.getNamedItem("launchMode");
 						if (launchModeNode != null) {
-							launchMode = ActivityLaunchMode.valueOf(launchModeNode.getTextContent());
+							if (!FLOW_DROID_LAYOUT) {
+								launchMode = ActivityLaunchMode.valueOf(launchModeNode.getTextContent());
+							} else {
+								launchMode = ActivityLaunchMode.class.
+										getEnumConstants()[Integer.parseInt(launchModeNode.getTextContent())];
+							}
 						}
 						activityAndLaunchModes.put(cls, launchMode);
 					}
