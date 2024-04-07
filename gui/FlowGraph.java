@@ -1,5 +1,5 @@
 /*
- * Flowgraph.java - part of the GATOR project
+ * FlowGraph.java - part of the GATOR project
  *
  * Copyright (c) 2014, 2015 The Ohio State University
  *
@@ -118,7 +118,7 @@ import com.google.common.collect.Multimap;
 import com.google.common.collect.Sets;
 
 // This is the constraint graph described in our paper.
-public class Flowgraph implements MethodNames {
+public class FlowGraph implements MethodNames {
     static final String FAKE_NAME_PREFIX = "FakeName_";
     private long fakeNameIndex = 0;
 
@@ -143,7 +143,7 @@ public class Flowgraph implements MethodNames {
     // locations but contain the same value.
     public Map<String, NStringConstantNode> allNStringConstantNodes = Maps.newHashMap();
 
-    public Hierarchy hier;
+    public Hierarchy hierarchy;
     public Set<Integer> allLayoutIds;
     public Set<Integer> allMenuIds;
     public Set<Integer> allWidgetIds;
@@ -154,7 +154,6 @@ public class Flowgraph implements MethodNames {
     ListenerSpecification listenerSpecs;
 
     public Multimap<Stmt, SootMethod> regToEventHandlers = HashMultimap.create();
-    // public Map<Stmt, Set<SootMethod>> regToEventHandlers = Maps.newHashMap();
 
     // Utils
     JimpleUtil jimpleUtil;
@@ -162,9 +161,9 @@ public class Flowgraph implements MethodNames {
     XMLParser xmlUtil;
     private final Set<Integer> allDrawableIds;
 
-    public Flowgraph(Hierarchy hier, Set<Integer> allLayoutIds, Set<Integer> allMenuIds, Set<Integer> allWidgetIds,
+    public FlowGraph(Hierarchy hierarchy, Set<Integer> allLayoutIds, Set<Integer> allMenuIds, Set<Integer> allWidgetIds,
                      Set<Integer> allStringIds, Set<Integer> allDrawableIds) {
-        this.hier = hier;
+        this.hierarchy = hierarchy;
         this.allLayoutIds = allLayoutIds;
         this.allMenuIds = allMenuIds;
         this.allWidgetIds = allWidgetIds;
@@ -173,7 +172,7 @@ public class Flowgraph implements MethodNames {
 
         this.listenerSpecs = ListenerSpecification.v();
 
-        this.jimpleUtil = JimpleUtil.v(hier);
+        this.jimpleUtil = JimpleUtil.v(hierarchy);
         this.graphUtil = GraphUtil.v();
         this.xmlUtil = XMLParser.Factory.getXMLParser();
     }
@@ -192,7 +191,6 @@ public class Flowgraph implements MethodNames {
         for (Integer i : allStringIds) {
             stringIdNode(i);
         }
-
         for (Integer i : allDrawableIds) {
             drawableIdNode(i);
         }
@@ -201,9 +199,8 @@ public class Flowgraph implements MethodNames {
     void processFrameworkManagedCallbacks() {
         // 1) nodes and "this"-parameter edges for activities
         // 2) nodes and "menu"-parameter for Menu
-        // (TODO: other framework created/managed classes)
-        for (SootClass c : hier.frameworkManaged.keySet()) {
-            if (hier.applicationActivityClasses.contains(c)) {
+        for (SootClass c : hierarchy.frameworkManaged.keySet()) {
+            if (hierarchy.applicationActivityClasses.contains(c)) {
                 processActivityCallbacks(c);
             } else {
                 System.out.println("[TODO] Unhandled framework-managed class " + c);
@@ -222,18 +219,18 @@ public class Flowgraph implements MethodNames {
         modelOnCreateOrPrepareOptionsMenuAndItsFlowToItemSelected(c);
         modelFlowFromCreateContextMenuToItemSelected(c);
         // Connect activity node to <this> of callback methods
-        Set<SootMethod> callbacks = hier.frameworkManaged.get(c);
+        Set<SootMethod> callbacks = hierarchy.frameworkManaged.get(c);
         for (SootMethod callbackPrototype : callbacks) {
-            String subsig = callbackPrototype.getSubSignature();
-            SootClass matched = hier.matchForVirtualDispatch(subsig, c);
+            String subSignature = callbackPrototype.getSubSignature();
+            SootClass matched = hierarchy.matchForVirtualDispatch(subSignature, c);
             if (matched == null) {
-                System.out.println("[WARNING] " + subsig + " does not exist for " + c);
+                System.out.println("[WARNING] " + subSignature + " does not exist for " + c);
                 continue;
             }
             if (!matched.isApplicationClass()) {
                 continue;
             }
-            SootMethod callback = matched.getMethod(subsig);
+            SootMethod callback = matched.getMethod(subSignature);
             Local thisLocal = jimpleUtil.thisLocal(callback);
             NActivityNode actNode = activityNode(c);
             actNode.addEdgeTo(varNode(thisLocal), null);
@@ -246,11 +243,11 @@ public class Flowgraph implements MethodNames {
 
     void modelOnCreateOrPrepareOptionsMenuAndItsFlowToItemSelected(SootClass activityClass) {
         Set<SootMethod> menuCallbacks = Sets.newHashSet();
-        SootClass matched = hier.matchForVirtualDispatch(onCreateOptionsMenuSubsig, activityClass);
+        SootClass matched = hierarchy.matchForVirtualDispatch(onCreateOptionsMenuSubsig, activityClass);
         if (matched != null && matched.isApplicationClass()) {
             menuCallbacks.add(matched.getMethod(onCreateOptionsMenuSubsig));
         }
-        matched = hier.matchForVirtualDispatch(onPrepareOptionsMenuSubsig, activityClass);
+        matched = hierarchy.matchForVirtualDispatch(onPrepareOptionsMenuSubsig, activityClass);
         if (matched != null && matched.isApplicationClass()) {
             menuCallbacks.add(matched.getMethod(onPrepareOptionsMenuSubsig));
         }
@@ -271,7 +268,7 @@ public class Flowgraph implements MethodNames {
     }
 
     void modelFlowFromCreateContextMenuToItemSelected(SootClass activityClass) {
-        SootClass matched = hier.matchForVirtualDispatch(onCreateContextMenuSubSig, activityClass);
+        SootClass matched = hierarchy.matchForVirtualDispatch(onCreateContextMenuSubSig, activityClass);
         if (matched == null || !matched.isApplicationClass()) {
             return;
         }
@@ -314,7 +311,7 @@ public class Flowgraph implements MethodNames {
 
     void getAndSaveDialogLocalsForActivityCallback(SootClass activityClass, String callbackSubsig,
                                                    Function<SootMethod, Set<Local>> getDialogLocals, Set<Local> localSet) {
-        SootClass matched = hier.matchForVirtualDispatch(callbackSubsig, activityClass);
+        SootClass matched = hierarchy.matchForVirtualDispatch(callbackSubsig, activityClass);
         if (matched != null && matched.isApplicationClass()) {
             SootMethod dialogCallback = matched.getMethod(callbackSubsig);
             localSet.addAll(getDialogLocals.apply(dialogCallback));
@@ -326,56 +323,20 @@ public class Flowgraph implements MethodNames {
 
     void processApplicationClasses() {
         // Now process each "ordinary" statements
-        for (SootClass c : hier.appClasses) {
-            // for (Iterator<SootMethod> iter = c.getMethods().iterator();
-            // iter.hasNext();) {
-            for (Iterator<SootMethod> iter = Lists.newArrayList(c.getMethods()).iterator(); iter.hasNext();) {
-                currentMethod = iter.next();
+        for (SootClass c : hierarchy.appClasses) {
+            for (SootMethod method : Lists.newArrayList(c.getMethods())) {
+                currentMethod = method;
                 if (!currentMethod.isConcrete()) {
                     continue;
                 }
                 Body b = currentMethod.retrieveActiveBody();
-                Iterator<Unit> stmts = b.getUnits().iterator();
-                while (stmts.hasNext()) {
-                    currentStmt = (Stmt) stmts.next();
-                    if (currentStmt instanceof ReturnVoidStmt) {
-                        continue;
-                    }
-                    if (currentStmt instanceof ThrowStmt) {
-                        continue;
-                    }
-                    if (currentStmt instanceof GotoStmt) {
-                        continue;
-                    }
-                    if (currentStmt instanceof BreakpointStmt) {
-                        continue;
-                    }
-                    if (currentStmt instanceof NopStmt) {
-                        continue;
-                    }
-                    if (currentStmt instanceof RetStmt) {
-                        continue;
-                    }
-                    if (currentStmt instanceof IfStmt) {
-                        continue;
-                    }
-                    if (currentStmt instanceof TableSwitchStmt) {
-                        continue;
-                    }
-                    if (currentStmt instanceof LookupSwitchStmt) {
-                        continue;
-                    }
-                    if (currentStmt instanceof MonitorStmt) {
-                        continue;
-                    }
-                    jimpleUtil.record(currentStmt, currentMethod); // remember
-                    // the
-                    // method
-
+                for (Unit unit : b.getUnits()) {
+                    currentStmt = (Stmt) unit;
                     // Some "special" handling of calls
                     if (currentStmt.containsInvokeExpr()) {
+                        jimpleUtil.record(currentStmt, currentMethod);
                         InvokeExpr ie = currentStmt.getInvokeExpr();
-                        SootMethod stm = null;
+                        SootMethod stm;
                         try {
                             stm = ie.getMethod(); // static target
                         } catch (Exception e) {
@@ -383,14 +344,8 @@ public class Flowgraph implements MethodNames {
                         }
 
                         // Model Android framework calls
-                        NOpNode opNode = null;
-                        try {
-                            opNode = createOpNode(currentStmt);
-                        } catch (Exception e) {
-                            System.out.println("Stmt: " + currentStmt.toString());
-                            e.printStackTrace();
-                            throw e;
-                        }
+                        NOpNode opNode;
+                        opNode = createOpNode(currentStmt);
                         if (opNode != null && opNode != NOpNode.NullNode) {
                             allNNodes.add(opNode);
                             continue;
@@ -420,9 +375,8 @@ public class Flowgraph implements MethodNames {
                             continue;
                         }
                         SootClass stc = ((RefType) rcv_t).getSootClass();
-                        for (Iterator<SootClass> trg_i = hier.getConcreteSubtypes(stc).iterator(); trg_i.hasNext();) {
-                            SootClass sub = trg_i.next();
-                            SootMethod trg = hier.virtualDispatch(stm, sub);
+                        for (SootClass sub : hierarchy.getConcreteSubtypes(stc)) {
+                            SootMethod trg = hierarchy.virtualDispatch(stm, sub);
                             if (trg != null && trg.getDeclaringClass().isApplicationClass()) {
                                 processFlowAtCall(currentStmt, trg);
                             }
@@ -430,11 +384,12 @@ public class Flowgraph implements MethodNames {
                         continue;
                     } // the statement was a call
 
-                    // assignment (but not with a call; calls are already
-                    // handled)
+                    // assignment (but not with a call; calls are already handled
                     if (!(currentStmt instanceof DefinitionStmt)) {
                         continue;
                     }
+
+                    jimpleUtil.record(currentStmt, currentMethod);
                     DefinitionStmt ds = (DefinitionStmt) currentStmt;
                     Value lhs = ds.getLeftOp();
                     // filter based on types
@@ -526,9 +481,9 @@ public class Flowgraph implements MethodNames {
         processFlowFromSetListenerToEventHandlers();
     }
 
-    public boolean processFlowFromSetListenerToEventHandlers() {
+    public void processFlowFromSetListenerToEventHandlers() {
         if (tasks.isEmpty()) {
-            return false;
+            return;
         }
         // SetListener to event handler flow
         for (FlowFromSetListenerToEventHandlers t : tasks) {
@@ -536,7 +491,6 @@ public class Flowgraph implements MethodNames {
                     t.viewNode, t.setListener, t.s, t.caller, t.registration, t.isContextMenuSetListener);
         }
         tasks.clear();
-        return true;
     }
 
     public Map<SootClass, NOptionsMenuNode> activityClassToOptionsMenu = Maps.newHashMap();
@@ -840,8 +794,7 @@ public class Flowgraph implements MethodNames {
 
         // SensorManager.registerListener(...)
         {
-            NOpNode registerListener = null;
-            return registerListener;
+            return null;
         }
     }
 
@@ -855,7 +808,7 @@ public class Flowgraph implements MethodNames {
         }
         Local rcv = jimpleUtil.receiver(ie);
         SootClass rcvClass = ((RefType) rcv.getType()).getSootClass();
-        if (!hier.viewClasses.contains(rcvClass)) {
+        if (!hierarchy.viewClasses.contains(rcvClass)) {
             return null;
         }
         NVarNode receiverNode = varNode(rcv);
@@ -961,8 +914,8 @@ public class Flowgraph implements MethodNames {
         if (!(subsig.equals(setContentViewSubSig))) {
             return null;
         }
-        boolean isActivity = hier.libActivityClasses.contains(c) || hier.applicationActivityClasses.contains(c);
-        boolean isDialog = hier.libraryDialogClasses.contains(c) || hier.applicationDialogClasses.contains(c);
+        boolean isActivity = hierarchy.libActivityClasses.contains(c) || hierarchy.applicationActivityClasses.contains(c);
+        boolean isDialog = hierarchy.libraryDialogClasses.contains(c) || hierarchy.applicationDialogClasses.contains(c);
         if (!isActivity && !isDialog) {
             return null;
         }
@@ -975,7 +928,7 @@ public class Flowgraph implements MethodNames {
         NVarNode receiverNode = varNode(jimpleUtil.receiver(ie));
         try {
             NInflate2OpNode inflate2 = new NInflate2OpNode(layoutIdNode, receiverNode,
-                    new Pair<Stmt, SootMethod>(s, jimpleUtil.lookup(s)), false);
+                    new Pair<>(s, jimpleUtil.lookup(s)), false);
             return inflate2;
         } catch (Exception ex) {
             Logger.verb("ERROR", "layoutIdNode : " + layoutIdVal.toString() + " not found");
@@ -1004,10 +957,10 @@ public class Flowgraph implements MethodNames {
         }
         Local rcv = jimpleUtil.receiver(ie);
         SootClass receiverClass = ((RefType) rcv.getType()).getSootClass();
-        if (viewFindView && !hier.viewClasses.contains(receiverClass)) {
+        if (viewFindView && !hierarchy.viewClasses.contains(receiverClass)) {
             return null;
         }
-        if (menuFindItem && !hier.menuClasses.contains(receiverClass)) {
+        if (menuFindItem && !hierarchy.menuClasses.contains(receiverClass)) {
             return null;
         }
         Value widgetIdVal = null;
@@ -1060,10 +1013,10 @@ public class Flowgraph implements MethodNames {
         Local receiver = jimpleUtil.receiver(ie);
         SootClass receiverClass = ((RefType) receiver.getType()).getSootClass();
 
-        boolean isActivity = hier.libActivityClasses.contains(receiverClass)
-                || hier.applicationActivityClasses.contains(receiverClass);
-        boolean isDialog = hier.libraryDialogClasses.contains(receiverClass)
-                || hier.applicationDialogClasses.contains(receiverClass);
+        boolean isActivity = hierarchy.libActivityClasses.contains(receiverClass)
+                || hierarchy.applicationActivityClasses.contains(receiverClass);
+        boolean isDialog = hierarchy.libraryDialogClasses.contains(receiverClass)
+                || hierarchy.applicationDialogClasses.contains(receiverClass);
         if (!isActivity && !isDialog) {
             return null;
         }
@@ -1093,8 +1046,8 @@ public class Flowgraph implements MethodNames {
         SootClass c = callee.getDeclaringClass();
         String subsig = callee.getSubSignature();
 
-        boolean viewType = hier.viewClasses.contains(c);
-        boolean menuType = hier.menuClasses.contains(c);
+        boolean viewType = hierarchy.viewClasses.contains(c);
+        boolean menuType = hierarchy.menuClasses.contains(c);
         if (!viewType && !menuType) {
             return null;
         }
@@ -1158,10 +1111,10 @@ public class Flowgraph implements MethodNames {
         Local receiver = jimpleUtil.receiver(ie);
         SootClass receiverClass = ((RefType) receiver.getType()).getSootClass();
 
-        boolean isActivity = hier.libActivityClasses.contains(receiverClass)
-                || hier.applicationActivityClasses.contains(receiverClass);
-        boolean isDialog = hier.libraryDialogClasses.contains(receiverClass)
-                || hier.applicationDialogClasses.contains(receiverClass);
+        boolean isActivity = hierarchy.libActivityClasses.contains(receiverClass)
+                || hierarchy.applicationActivityClasses.contains(receiverClass);
+        boolean isDialog = hierarchy.libraryDialogClasses.contains(receiverClass)
+                || hierarchy.applicationDialogClasses.contains(receiverClass);
         if (!isActivity && !isDialog) {
             return null;
         }
@@ -1180,7 +1133,7 @@ public class Flowgraph implements MethodNames {
         SootMethod callee = ie.getMethod();
         SootClass c = callee.getDeclaringClass();
         String name = callee.getName();
-        boolean match = name.equals(addViewName) && hier.viewClasses.contains(c);
+        boolean match = name.equals(addViewName) && hierarchy.viewClasses.contains(c);
         if (!match) {
             return null;
         }
@@ -1202,7 +1155,7 @@ public class Flowgraph implements MethodNames {
         }
         Local rcv = jimpleUtil.receiver(ie);
         SootClass rcvClass = ((RefType) rcv.getType()).getSootClass();
-        if (!hier.viewClasses.contains(rcvClass)) {
+        if (!hierarchy.viewClasses.contains(rcvClass)) {
             return null;
         }
         NVarNode receiverNode = varNode(rcv);
@@ -1279,7 +1232,7 @@ public class Flowgraph implements MethodNames {
         // NOTE(tony): right now, we record MenuItem classes separately from
         // other
         // View classes. We may merge them in future revisions.
-        if (!hier.viewClasses.contains(viewType) && !hier.menuItemClasses.contains(viewType)) {
+        if (!hierarchy.viewClasses.contains(viewType) && !hierarchy.menuItemClasses.contains(viewType)) {
             return null;
         }
 
@@ -1364,8 +1317,8 @@ public class Flowgraph implements MethodNames {
             boolean valid = (viewParaType instanceof RefType);
             if (valid) {
                 SootClass viewParaClass = ((RefType) viewParaType).getSootClass();
-                valid = hier.isViewClass(viewParaClass)
-                        || hier.isSubclassOf(viewParaClass, Scene.v().getSootClass("android.view.MenuItem"));
+                valid = hierarchy.isViewClass(viewParaClass)
+                        || hierarchy.isSubclassOf(viewParaClass, Scene.v().getSootClass("android.view.MenuItem"));
             }
             if (!valid) {
                 System.out.println("[WARNING] Cannot find View parameter for " + h.getSignature() + ", listenerObject: "
@@ -1385,7 +1338,7 @@ public class Flowgraph implements MethodNames {
         // Create SetListener op node
         NVarNode viewNode = varNode(viewLocal);
         NVarNode listenerNode = varNode(listenerLocal);
-        Pair<Stmt, SootMethod> callSite = (s == null ? null : new Pair<Stmt, SootMethod>(s, caller));
+        Pair<Stmt, SootMethod> callSite = (s == null ? null : new Pair<>(s, caller));
         NSetListenerOpNode setListener = new NSetListenerOpNode(viewNode, listenerNode, callSite,
                 isContextMenuSetListener, artificial);
 
@@ -1466,16 +1419,12 @@ public class Flowgraph implements MethodNames {
         }
 
         // Some listeners may be "inflated" because they are views as well. So,
-        // we
-        // cannot use graph reachability to find concrete type of listener.
-        // Instead,
-        // we should use class hierarchy.
+        // we cannot use graph reachability to find concrete type of listener.
+        // Instead, we should use class hierarchy.
         // Then, for each concrete actual type, do virtual dispatch for the
-        // method
-        // prototypes found in first step.
+        // method prototypes found in first step.
         Set<SootMethod> handlers = Sets.newHashSet();
         computeConcreteHandlers(handlers, handlerPrototypes, listenerNode);
-        // regToEventHandlers.put(s, handlers);
         regToEventHandlers.putAll(s, handlers);
         // Finally, create flow edges to represent the link between SetListener
         // and the dispatched callback methods.
@@ -1508,8 +1457,8 @@ public class Flowgraph implements MethodNames {
             boolean valid = (viewParaType instanceof RefType);
             if (valid) {
                 SootClass viewParaClass = ((RefType) viewParaType).getSootClass();
-                valid = hier.isViewClass(viewParaClass)
-                        || hier.isSubclassOf(viewParaClass, Scene.v().getSootClass("android.view.MenuItem"));
+                valid = hierarchy.isViewClass(viewParaClass)
+                        || hierarchy.isSubclassOf(viewParaClass, Scene.v().getSootClass("android.view.MenuItem"));
             }
             if (!valid) {
                 System.out.println("[WARNING] Cannot find View parameter for " + h.getSignature() + ", listenerClass: "
@@ -1532,7 +1481,7 @@ public class Flowgraph implements MethodNames {
         for (SootClass possibleListenerType : listenerTypes) {
             for (SootMethod prototype : handlerPrototypes) {
                 String prototypeSubsig = prototype.getSubSignature();
-                SootClass matchedClass = hier.matchForVirtualDispatch(prototypeSubsig, possibleListenerType);
+                SootClass matchedClass = hierarchy.matchForVirtualDispatch(prototypeSubsig, possibleListenerType);
                 if (matchedClass != null && matchedClass.isApplicationClass()
                         && listenerSpecs.isListenerType(matchedClass)) {
                     SootMethod h = matchedClass.getMethod(prototypeSubsig);
@@ -1546,7 +1495,7 @@ public class Flowgraph implements MethodNames {
 
     Set<SootClass> computePossibleListenerTypesCHA(NVarNode listenerNode) {
         SootClass declaredListenerType = ((RefType) listenerNode.l.getType()).getSootClass();
-        return Collections.unmodifiableSet(hier.getSubtypes(declaredListenerType));
+        return Collections.unmodifiableSet(hierarchy.getSubtypes(declaredListenerType));
     }
 
     Set<SootClass> computePossibleListenerTypesPTA(NVarNode listenerNode) {
@@ -1680,7 +1629,7 @@ public class Flowgraph implements MethodNames {
         }
         Local rcv = jimpleUtil.receiver(ie);
         SootClass receiverClass = ((RefType) rcv.getType()).getSootClass();
-        if (!hier.applicationActivityClasses.contains(receiverClass)) {
+        if (!hierarchy.applicationActivityClasses.contains(receiverClass)) {
             return null;
         }
         // TabActivity.setContentView(id:tab_content)
@@ -1770,7 +1719,7 @@ public class Flowgraph implements MethodNames {
         Local receiver = jimpleUtil.receiver(ie);
         Type receiverType = receiver.getType();
         SootClass receiverClass = ((RefType) receiverType).getSootClass();
-        if (!hier.isSubclassOf(receiverClass, Scene.v().getSootClass("android.app.ListActivity"))) {
+        if (!hierarchy.isSubclassOf(receiverClass, Scene.v().getSootClass("android.app.ListActivity"))) {
             return null;
         }
 
@@ -1818,8 +1767,8 @@ public class Flowgraph implements MethodNames {
         }
         for (NActivityNode activity : suspects) {
             SootClass activityClass = activity.c;
-            if (hier.isSubclassOf(activityClass, Scene.v().getSootClass("android.app.ListActivity"))) {
-                if (hier.isSubclassOf(activityClass, Scene.v().getSootClass("android.preference.PreferenceActivity"))) {
+            if (hierarchy.isSubclassOf(activityClass, Scene.v().getSootClass("android.app.ListActivity"))) {
+                if (hierarchy.isSubclassOf(activityClass, Scene.v().getSootClass("android.preference.PreferenceActivity"))) {
                     // TODO(tony): handle Preference in future, but ignore for
                     // now
                     continue;
@@ -1837,10 +1786,10 @@ public class Flowgraph implements MethodNames {
         SootClass listViewClass = Scene.v().getSootClass("android.widget.ListView");
         for (NActivityNode activityNode : allNActivityNodes.values()) {
             SootClass activityClass = activityNode.c;
-            if (!hier.isSubclassOf(activityClass, listActivityClass)) {
+            if (!hierarchy.isSubclassOf(activityClass, listActivityClass)) {
                 continue;
             }
-            SootClass matched = hier.matchForVirtualDispatch(onListItemClickSubSig, activityClass);
+            SootClass matched = hierarchy.matchForVirtualDispatch(onListItemClickSubSig, activityClass);
             if (matched != null && matched.isApplicationClass()) {
                 /*
                  * onListItemClick (ListView l, View v, int position, long id)
@@ -1895,8 +1844,8 @@ public class Flowgraph implements MethodNames {
         fakeListenerClass.addInterface(superClass);
 
         // patch Hierarchy
-        hier.appClasses.add(fakeListenerClass);
-        hier.addFakeListenerClass(fakeListenerClass, superClass);
+        hierarchy.appClasses.add(fakeListenerClass);
+        hierarchy.addFakeListenerClass(fakeListenerClass, superClass);
         // patch scene
         Scene.v().addClass(fakeListenerClass);
         fakeListenerClass.setApplicationClass();
@@ -1978,7 +1927,7 @@ public class Flowgraph implements MethodNames {
     }
 
     void patchRootlessListActivity(NActivityNode activity) {
-        // System.out.println("[Flowgraph] Patching " + activity);
+        // System.out.println("[FlowGraph] Patching " + activity);
         // Inflate2
         // Starting from 4.0.1_r1 onward, it's list_content_simple. Before that,
         // it's list_content.
@@ -2054,7 +2003,7 @@ public class Flowgraph implements MethodNames {
             return false;
         }
         SootClass receiverClass = ((RefType) receiverType).getSootClass();
-        if (!hier.isSubclassOf(receiverClass, listViewClass) && !hier.isSubclassOf(receiverClass, gridViewClass)) {
+        if (!hierarchy.isSubclassOf(receiverClass, listViewClass) && !hierarchy.isSubclassOf(receiverClass, gridViewClass)) {
             return false;
         }
 
@@ -2070,7 +2019,7 @@ public class Flowgraph implements MethodNames {
         }
         Local receiver = jimpleUtil.receiver(ie);
         SootClass receiverClass = ((RefType) receiver.getType()).getSootClass();
-        if (!hier.isSubclassOf(receiverClass, listAdapterClass)) {
+        if (!hierarchy.isSubclassOf(receiverClass, listAdapterClass)) {
             return false;
         }
         listAdapterConstructorCalls.add(s);
@@ -2086,7 +2035,7 @@ public class Flowgraph implements MethodNames {
         }
         Local receiver = jimpleUtil.receiver(ie);
         SootClass receiverClass = ((RefType) receiver.getType()).getSootClass();
-        if (!hier.isSubclassOf(receiverClass, listAdapterClass)) {
+        if (!hierarchy.isSubclassOf(receiverClass, listAdapterClass)) {
             return false;
         }
 
@@ -2138,7 +2087,7 @@ public class Flowgraph implements MethodNames {
         for (Stmt s : listAdapterConstructorCalls) {
             SootClass constructorClass = s.getInvokeExpr().getMethod().getDeclaringClass();
             // ArrayAdapter only
-            if (!hier.isSubclassOf(constructorClass, arrayAdapterClass)) {
+            if (!hierarchy.isSubclassOf(constructorClass, arrayAdapterClass)) {
                 continue;
             }
             String stringForStmt = s + " @ " + jimpleUtil.lookup(s);
@@ -2215,12 +2164,12 @@ public class Flowgraph implements MethodNames {
             if (!(src instanceof NObjectNode)) {
                 continue;
             }
-            SootClass concreteType = hier.matchForVirtualDispatch(getViewSubSig, ((NObjectNode) src).getClassType());
+            SootClass concreteType = hierarchy.matchForVirtualDispatch(getViewSubSig, ((NObjectNode) src).getClassType());
             if (concreteType == null)
                 continue;
             SootMethod getView = concreteType.getMethod(getViewSubSig);
             // We handle ArrayAdapter only for now.
-            if (!hier.isSubclassOf(concreteType, baseAdapterClass)) {
+            if (!hierarchy.isSubclassOf(concreteType, baseAdapterClass)) {
                 return;
             }
             if (concreteType.isApplicationClass()) {
@@ -2301,10 +2250,10 @@ public class Flowgraph implements MethodNames {
             SootClass actualAdapterClass = adapterObject.getClassType();
 
             // Handle ArrayAdapter only for now
-            if (!hier.isSubclassOf(actualAdapterClass, arrayAdapterClass)) {
+            if (!hierarchy.isSubclassOf(actualAdapterClass, arrayAdapterClass)) {
                 continue;
             }
-            SootClass matchedClass = hier.matchForVirtualDispatch(getViewSubSig, actualAdapterClass);
+            SootClass matchedClass = hierarchy.matchForVirtualDispatch(getViewSubSig, actualAdapterClass);
 
             if (matchedClass.isApplicationClass()) {
                 // It's calling application code, we are fine
@@ -2395,7 +2344,7 @@ public class Flowgraph implements MethodNames {
                 }
                 if (callClass.equals(arrayAdapterClass)) {
                     return invokeExpr.getArg(1);
-                } else if (hier.isSubclassOf(callClass, arrayAdapterClass)) {
+                } else if (hierarchy.isSubclassOf(callClass, arrayAdapterClass)) {
                     return extractLayoutIdFromAdapterConstructor(s);
                 }
                 return null;
@@ -2432,14 +2381,14 @@ public class Flowgraph implements MethodNames {
         SootClass receiverClass = ((RefType) receiverType).getSootClass();
         SootMethod callee = ie.getMethod();
         String calleeSubsig = callee.getSubSignature();
-        if (calleeSubsig.equals(viewShowContextMenuSubsig) && hier.viewClasses.contains(receiverClass)) {
+        if (calleeSubsig.equals(viewShowContextMenuSubsig) && hierarchy.viewClasses.contains(receiverClass)) {
             explicitShowContextMenuCallAndViewLocals.put(s, receiver);
             return true;
         }
 
         if (calleeSubsig.equals(activityOpenContextMenuSubsig)
-                && (hier.applicationActivityClasses.contains(receiverClass)
-                || hier.libActivityClasses.contains(receiverClass))) {
+                && (hierarchy.applicationActivityClasses.contains(receiverClass)
+                || hierarchy.libActivityClasses.contains(receiverClass))) {
             Value viewArg = ie.getArg(0);
             if (viewArg instanceof Local) {
                 explicitShowContextMenuCallAndViewLocals.put(s, (Local) viewArg);
@@ -2463,8 +2412,8 @@ public class Flowgraph implements MethodNames {
         SootMethod callee = ie.getMethod();
         String calleeSubsig = callee.getSubSignature();
         if (calleeSubsig.equals(activityOpenOptionsMenuSubsig)
-                && (hier.applicationActivityClasses.contains(receiverClass)
-                || hier.libActivityClasses.contains(receiverClass))) {
+                && (hierarchy.applicationActivityClasses.contains(receiverClass)
+                || hierarchy.libActivityClasses.contains(receiverClass))) {
             explicitShowOptionsMenuCallAndActivityLocals.put(s, receiver);
             return true;
         }
@@ -2569,9 +2518,6 @@ public class Flowgraph implements MethodNames {
 
     // Look at recorded builder calls, and convert them into dialog calls
     void processRecordedAlertDialogBuilderCalls() {
-        // Debug print
-        // printRecordedDialogBuilderCalls();
-
         // Simple reachability of Builder objects
         alertDialogBuilderBackwardReachability();
 
@@ -2601,22 +2547,10 @@ public class Flowgraph implements MethodNames {
                 // Additional step when it is alertDialogBuilder.show()
                 boolean isShow = "show".equals(s.getInvokeExpr().getMethod().getName());
                 if (isShow) {
-                    Set<Stmt> shows = dialogObjectAndShows.get(dialog);
-                    if (shows == null) {
-                        shows = Sets.newHashSet();
-                        dialogObjectAndShows.put(dialog, shows);
-                    }
+                    Set<Stmt> shows = dialogObjectAndShows.computeIfAbsent(dialog, k -> Sets.newHashSet());
                     shows.add(s);
                 }
             }
-        }
-
-        // Some warnings
-        for (SootClass c : subclassesOfAlertDialog) {
-            System.out.println("  \033[1;31m[TODO]\033[0m Customized AlertDialog: " + c);
-        }
-        for (SootClass c : subclassesOfAlertDialogBuilder) {
-            System.out.println("  \033[1;31m[TDOO]\033[0m Customized AlertDialog.Builder: " + c);
         }
     }
 
@@ -2628,7 +2562,7 @@ public class Flowgraph implements MethodNames {
         SootClass alertDialogClass = Scene.v().getSootClass(alertDialogClassName);
         for (Map.Entry<NDialogNode, Set<Stmt>> entry : dialogObjectAndShows.entrySet()) {
             NDialogNode alertDialog = entry.getKey();
-            if (!hier.isSubclassOf(alertDialog.c, alertDialogClass)) {
+            if (!hierarchy.isSubclassOf(alertDialog.c, alertDialogClass)) {
                 continue;
             }
 
@@ -2649,7 +2583,7 @@ public class Flowgraph implements MethodNames {
             NDialogNode dialog = (NDialogNode) window;
             // Look at the setters
             processRecordedDialogSetters(dialog);
-            if (hier.isSubclassOf(dialog.c, alertDialogClass)) {
+            if (hierarchy.isSubclassOf(dialog.c, alertDialogClass)) {
                 processConvertedAlertDialogSetters(dialog);
             }
         }
@@ -2701,7 +2635,7 @@ public class Flowgraph implements MethodNames {
 
                     // Now, let's "call" dialog.show() if it is an AlertDialog
                     if (isShow
-                            && hier.isSubclassOf(dialog.getClassType(), Scene.v().getSootClass(alertDialogClassName))) {
+                            && hierarchy.isSubclassOf(dialog.getClassType(), Scene.v().getSootClass(alertDialogClassName))) {
                         for (Stmt showStmt : dialogCalls) {
                             modelAlertControllerInstallContent(dialog, showStmt);
                         }
@@ -2776,7 +2710,7 @@ public class Flowgraph implements MethodNames {
 
     void flowToDialogLifecycleMethods(NDialogNode dialog) {
         for (String subsig : dialogLifecycleMethodSubSigs) {
-            SootClass matched = hier.matchForVirtualDispatch(subsig, dialog.c);
+            SootClass matched = hierarchy.matchForVirtualDispatch(subsig, dialog.c);
             if (matched.isApplicationClass()) {
                 SootMethod matchedMethod = matched.getMethod(subsig);
                 dialog.addEdgeTo(varNode(jimpleUtil.thisLocal(matchedMethod)), null);
@@ -3087,7 +3021,7 @@ public class Flowgraph implements MethodNames {
                 continue;
             }
             SootClass c = ((NObjectNode) n).getClassType();
-            SootClass matched = hier.matchForVirtualDispatch(handlerSubsig, c);
+            SootClass matched = hierarchy.matchForVirtualDispatch(handlerSubsig, c);
             if (matched != null) {
                 SootMethod handlerMethod = matched.getMethod(handlerSubsig);
                 // 1. button = alertDialog.findViewById(button)
@@ -3126,8 +3060,8 @@ public class Flowgraph implements MethodNames {
         fakeListenerClass.addInterface(superClass);
 
         // patch Hierarchy
-        hier.appClasses.add(fakeListenerClass);
-        hier.addFakeListenerClass(fakeListenerClass, superClass);
+        hierarchy.appClasses.add(fakeListenerClass);
+        hierarchy.addFakeListenerClass(fakeListenerClass, superClass);
         // patch scene
         Scene.v().addClass(fakeListenerClass);
         fakeListenerClass.setApplicationClass();
@@ -3229,7 +3163,7 @@ public class Flowgraph implements MethodNames {
                 continue;
             }
             SootClass c = ((NAllocNode) n).getClassType();
-            SootClass matched = hier.matchForVirtualDispatch(handlerSubsig, c);
+            SootClass matched = hierarchy.matchForVirtualDispatch(handlerSubsig, c);
             if (matched != null) {
                 SootMethod handlerMethod = matched.getMethod(handlerSubsig);
                 Local listenerLocal = jimpleUtil.thisLocal(handlerMethod);
@@ -3418,13 +3352,13 @@ public class Flowgraph implements MethodNames {
         SootClass receiverClass = ((RefType) receiverType).getSootClass();
         SootClass dialogClass = Scene.v().getSootClass(dialogClassName);
 
-        if (!hier.isSubclassOf(receiverClass, dialogClass)) {
+        if (!hierarchy.isSubclassOf(receiverClass, dialogClass)) {
             return false;
         }
         // If subclass of AlertDialog, can't handle yet. TODO
         SootClass alertDialogClass = Scene.v().getSootClass(alertDialogClassName);
         String receiverClassName = receiverClass.getName();
-        if (hier.isSubclassOf(receiverClass, alertDialogClass) && !receiverClassName.equals(alertDialogClassName)
+        if (hierarchy.isSubclassOf(receiverClass, alertDialogClass) && !receiverClassName.equals(alertDialogClassName)
                 && !receiverClassName.equals(timePickerDialogClassName) && !receiverClass.isApplicationClass()) {
             subclassesOfAlertDialog.add(receiverClass);
             return true;
@@ -3511,7 +3445,7 @@ public class Flowgraph implements MethodNames {
             return false;
         }
         SootClass receiverClass = ((RefType) receiverType).getSootClass();
-        if (!hier.applicationActivityClasses.contains(receiverClass)) {
+        if (!hierarchy.applicationActivityClasses.contains(receiverClass)) {
             return false;
         }
         SootMethod callee = ie.getMethod();
@@ -3555,7 +3489,7 @@ public class Flowgraph implements MethodNames {
             return false;
         }
         SootClass receiverClass = ((RefType) receiverType).getSootClass();
-        if (!hier.isSubclassOf(receiverClass, alertDialogBuilderClass)) {
+        if (!hierarchy.isSubclassOf(receiverClass, alertDialogBuilderClass)) {
             return false;
         }
         String receiverClassName = receiverClass.getName();
@@ -3845,7 +3779,7 @@ public class Flowgraph implements MethodNames {
                     continue;
                 }
                 SootClass factoryClass = ((NObjectNode) node).getClassType();
-                SootClass match = hier.matchForVirtualDispatch(tabContentFactoryCreateSubSig, factoryClass);
+                SootClass match = hierarchy.matchForVirtualDispatch(tabContentFactoryCreateSubSig, factoryClass);
                 if (match != null && match.isApplicationClass()) {
                     SootMethod createTabContent = match.getMethod(tabContentFactoryCreateSubSig);
                     for (Value ret : jimpleUtil.getReturnValues(createTabContent)) {
@@ -4005,7 +3939,7 @@ public class Flowgraph implements MethodNames {
     SootMethod modelFlowFromCreateOrPrepareMenuToItemSelected(NNode menuNode, SootClass menuClass,
                                                               SootClass activityClass, SootMethod createOrPrepareMenuMethod, String itemSelectedSubsig,
                                                               int menuItemPosition) {
-        SootClass itemSelectedClass = hier.matchForVirtualDispatch(itemSelectedSubsig, activityClass);
+        SootClass itemSelectedClass = hierarchy.matchForVirtualDispatch(itemSelectedSubsig, activityClass);
         if (itemSelectedClass == null || !itemSelectedClass.isApplicationClass()) {
             return null;
         }
@@ -4103,18 +4037,14 @@ public class Flowgraph implements MethodNames {
         return x;
     }
 
-    public NFieldNode lookupFieldNode(SootField field) {
-        return allNFieldNodes.get(field);
-    }
-
     public NObjectNode allocNodeOrSpecialObjectNode(Expr e) {
         if (e instanceof NewExpr) {
             SootClass type = ((RefType) e.getType()).getSootClass();
-            if (hier.isSubclassOf(type, Scene.v().getSootClass("android.app.Dialog"))) {
+            if (hierarchy.isSubclassOf(type, Scene.v().getSootClass("android.app.Dialog"))) {
                 jimpleUtil.record(e, currentStmt);
                 return dialogNode(type, currentStmt, currentMethod);
             }
-            if (hier.isSubclassOf(type, Scene.v().getSootClass("android.widget.TabHost$TabSpec"))) {
+            if (hierarchy.isSubclassOf(type, Scene.v().getSootClass("android.widget.TabHost$TabSpec"))) {
                 jimpleUtil.record(e, currentStmt);
                 return tabSpecNode(type, currentStmt, currentMethod);
             }
@@ -4129,7 +4059,7 @@ public class Flowgraph implements MethodNames {
         }
         if (e instanceof NewExpr) {
             SootClass c = ((NewExpr) e).getBaseType().getSootClass();
-            if (hier.viewClasses.contains(c)) {
+            if (hierarchy.viewClasses.contains(c)) {
                 x = createViewAllocNode(c);
             } else if (listenerSpecs.isListenerType(c)) {
                 x = new NListenerAllocNode(c);
@@ -4151,7 +4081,7 @@ public class Flowgraph implements MethodNames {
         x.c = c;
 
         // Additional code to find onCreateContextMenu
-        SootClass matched = hier.matchForVirtualDispatch(viewOnCreateContextMenuSubSig, c);
+        SootClass matched = hierarchy.matchForVirtualDispatch(viewOnCreateContextMenuSubSig, c);
         if (matched == null) {
             throw new RuntimeException(viewOnCreateContextMenuSubSig + " cannot be dispatched for " + c);
         }
@@ -4266,7 +4196,7 @@ public class Flowgraph implements MethodNames {
             stringIdNode = new NStringIdNode(stringId);
             allNStringIdNodes.put(stringId, stringIdNode);
             allNNodes.add(stringIdNode);
-            // System.out.println("{Flowgraph.stringIdNode} " + stringIdNode);
+            // System.out.println("{FlowGraph.stringIdNode} " + stringIdNode);
         }
         return stringIdNode;
     }
@@ -4278,7 +4208,7 @@ public class Flowgraph implements MethodNames {
             drawableIdNode = new NDrawableIdNode(drawableId);
             allNDrawableIdNode.put(drawableId, drawableIdNode);
             allNNodes.add(drawableIdNode);
-            // System.out.println("{Flowgraph.stringIdNode} " + stringIdNode);
+            // System.out.println("{FlowGraph.stringIdNode} " + stringIdNode);
         }
         return drawableIdNode;
     }
@@ -4303,7 +4233,7 @@ public class Flowgraph implements MethodNames {
             return varNode((Local) jimpleValue);
         }
         if (jimpleValue instanceof IntConstant) {
-            Integer integerConstant = new Integer(((IntConstant) jimpleValue).value);
+            Integer integerConstant = ((IntConstant) jimpleValue).value;
             if (allLayoutIds.contains(integerConstant)) {
                 return layoutIdNode(integerConstant);
             }
@@ -4341,7 +4271,7 @@ public class Flowgraph implements MethodNames {
      * void preProcessAppClasses(){ Map<Integer, Pair<String, Boolean>>
      * callbacks = XMLParser.Factory.getXMLParser().retrieveCallbacks();
      * if(callbacks.isEmpty()){ return; } for(SootClass appClz :
-     * hier.appClasses){ for (Iterator<SootMethod> iter =
+     * hierarchy.appClasses){ for (Iterator<SootMethod> iter =
      * appClz.getMethods().iterator(); iter.hasNext();) { currentMethod =
      * iter.next(); if (!currentMethod.isConcrete()) { continue; } Body body =
      * currentMethod.retrieveActiveBody(); PatchingChain<Unit> units =

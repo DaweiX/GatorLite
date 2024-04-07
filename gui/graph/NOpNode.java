@@ -126,9 +126,6 @@ public abstract class NOpNode extends NNode {
   private String opType;
   public Pair<Stmt, SootMethod> callSite;
 
-  public Type receiverType;
-  public Type parameterType;
-
   // Some operation nodes are added to model certain features of the framework.
   // These nodes do not correspond directly to statements in the application,
   // and we would like to annotate them and thus have the ability the exclude
@@ -157,14 +154,6 @@ public abstract class NOpNode extends NNode {
     }
   }
 
-  public String shortDescription() {
-    return opType + "[" + id + "]";
-  }
-
-  public String getOpType() {
-    return opType;
-  }
-
   @Override
   public String toString() {
     return opType + "[" + id + "] " +
@@ -180,10 +169,6 @@ public abstract class NOpNode extends NNode {
       result = Sets.newHashSet();
     }
     return result;
-  }
-
-  public static NOpNode lookupByStmt(Stmt s) {
-    return stmtAndNodes.get(s);
   }
 
   public boolean consumesLayoutId() {

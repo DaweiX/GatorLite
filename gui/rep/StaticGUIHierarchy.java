@@ -9,12 +9,13 @@
 package presto.android.gui.rep;
 
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 import presto.android.Configs;
 import presto.android.Hierarchy;
 import presto.android.MethodNames;
-import presto.android.gui.Flowgraph;
+import presto.android.gui.FlowGraph;
 import presto.android.gui.GUIAnalysisOutput;
 import presto.android.gui.IDNameExtractor;
 import presto.android.gui.JimpleUtil;
@@ -40,7 +41,7 @@ public class StaticGUIHierarchy extends GUIHierarchy {
 
     // Helpers
     GUIAnalysisOutput analysisOutput;
-    Flowgraph flowgraph;
+    FlowGraph flowgraph;
     Hierarchy hier = Hierarchy.v();
     JimpleUtil jimpleUtil = JimpleUtil.v();
     PropertyManager prop = PropertyManager.v();
@@ -71,6 +72,7 @@ public class StaticGUIHierarchy extends GUIHierarchy {
 
     void buildActivities() {
         for (SootClass activityClass : analysisOutput.getActivities()) {
+            System.out.printf("  - Activity: %s%n", activityClass.getName());
             currentActivity = activityClass;
             Activity act = new Activity();
             activities.add(act);
@@ -87,6 +89,7 @@ public class StaticGUIHierarchy extends GUIHierarchy {
 
     void buildDialogs() {
         for (NDialogNode dialogNode : analysisOutput.getDialogs()) {
+            System.out.printf("  - Dialog: %s%n", dialogNode.c);
             Dialog dialog = new Dialog();
             dialogs.add(dialog);
             dialog.name = dialogNode.c.getName();
@@ -158,7 +161,7 @@ public class StaticGUIHierarchy extends GUIHierarchy {
                 view.type = type.getName();
                 view.title = title;
                 Pair<Integer, String> idAndName = getIdAndName(node.idNode);
-                view.id = idAndName.getO1().intValue();
+                view.id = idAndName.getO1();
                 view.idName = idAndName.getO2();
                 parent.addChild(view);
                 buildEventAndHandlers(view, node);
@@ -173,7 +176,7 @@ public class StaticGUIHierarchy extends GUIHierarchy {
         parent.addChild(view);
         buildEventAndHandlers(view, node);
         view.type = type.getName();
-        view.id = idAndName.getO1().intValue();
+        view.id = idAndName.getO1();
         view.idName = idAndName.getO2();
 
         // print children
@@ -244,10 +247,8 @@ public class StaticGUIHierarchy extends GUIHierarchy {
         }
         Integer id = idNode.getIdValue();
         String name = idNode.getIdName();
+        System.out.printf("%s %s%n", id, name);
         if (idNameExtractor.isUnknown(name)) {
-            name = NO_ID_NAME;
-        }
-        if (name.equals(NO_ID_NAME)) {
             return NO_ID;
         } else {
             return new Pair<>(id, name);

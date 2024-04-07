@@ -4,7 +4,6 @@ import java.util.Set;
 import presto.android.Hierarchy;
 import presto.android.xml.XMLParser;
 import com.google.common.collect.Sets;
-import presto.android.gui.clients.GUIHierarchyPrinterClient;
 
 public class GUIAnalysis {
 
@@ -17,7 +16,7 @@ public class GUIAnalysis {
 	public Set<Integer> allStringIds = Sets.newHashSet();
 	public Set<Integer> allDrawableIds = Sets.newHashSet();
 
-	public Flowgraph flowgraph;
+	public FlowGraph flowgraph;
 	public FixpointSolver fixpointSolver;
 	public VariableValueQueryInterface variableValueQueryInterface;
 
@@ -66,17 +65,21 @@ public class GUIAnalysis {
 		populateIDContainers();
 
 		// 1. Build flow graph
-		flowgraph = new Flowgraph(hierarchy, allLayoutIds, allMenuIds, allWidgetIds, allStringIds, allDrawableIds);
+		System.out.println("  - Build flow graph");
+		flowgraph = new FlowGraph(hierarchy, allLayoutIds, allMenuIds, allWidgetIds, allStringIds, allDrawableIds);
 		flowgraph.build();
 
 		// 2. Fix-point computation
+		System.out.println("  - Fix-point computation");
 		fixpointSolver = new FixpointSolver(flowgraph);
 		fixpointSolver.solve();
 
 		// 3. Variable value query interface
+		System.out.println("  - Variable value query interface");
 		variableValueQueryInterface = DemandVariableValueQuery.v(flowgraph, fixpointSolver);
 
 		// 4. Construct the output
+		System.out.println("  - Construct output");
 		GUIAnalysisOutput output = new DefaultGUIAnalysisOutput(this);
 
 		long estimatedTime = System.nanoTime() - startTime;

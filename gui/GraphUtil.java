@@ -14,7 +14,6 @@ import java.util.Set;
 
 import presto.android.gui.graph.NNode;
 import presto.android.gui.graph.NOpNode;
-import soot.toolkits.scalar.Pair;
 
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
@@ -58,9 +57,7 @@ public class GraphUtil {
     }
   }
 
-  // ///
   public Set<NNode> backwardReachableNodes(NNode n) {
-    // p("[BackwardReachable] " + n);
     Set<NNode> res = Sets.newHashSet();
     findBackwardReachableNodes(n, res);
     return res;
@@ -91,7 +88,6 @@ public class GraphUtil {
     }
   }
 
-  // ///
   public Set<NNode> descendantNodes(NNode n) {
     Set<NNode> res = Sets.newHashSet();
     findDescendantNodes(n, res);
@@ -134,21 +130,6 @@ public class GraphUtil {
         }
         worklist.add(s);
         ancestorNodes.add(s);
-      }
-    }
-  }
-
-  public void dumpParentChildTree(NNode root) {
-    LinkedList<Pair<NNode, String>> stack = Lists.newLinkedList();
-    stack.addFirst(new Pair<NNode, String>(root, ""));
-    while (!stack.isEmpty()) {
-      Pair<NNode, String> p = stack.removeFirst();
-      NNode node = p.getO1();
-      String indent = p.getO2();
-      System.out.println(indent + node);
-      String newIndent = indent + "  ";
-      for (NNode child : node.getChildren()) {
-        stack.addFirst(new Pair<NNode, String>(child, newIndent));
       }
     }
   }

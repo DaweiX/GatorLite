@@ -31,14 +31,14 @@ import com.google.common.collect.Sets;
 public class DemandVariableValueQuery implements VariableValueQueryInterface {
   private static DemandVariableValueQuery theInstance;
 
-  private final Flowgraph flowgraph;
+  private final FlowGraph flowgraph;
   private final FixpointSolver solver;
 
   private final GraphUtil graphUtil;
   private final Hierarchy hier;
   private final ListenerSpecification listenerSpec;
 
-  DemandVariableValueQuery(Flowgraph flowgraph, FixpointSolver solver) {
+  DemandVariableValueQuery(FlowGraph flowgraph, FixpointSolver solver) {
     this.flowgraph = flowgraph;
     this.solver = solver;
     this.graphUtil = GraphUtil.v();
@@ -47,7 +47,7 @@ public class DemandVariableValueQuery implements VariableValueQueryInterface {
   }
 
   public static DemandVariableValueQuery v(
-      Flowgraph flowgraph,FixpointSolver solver) {
+          FlowGraph flowgraph, FixpointSolver solver) {
     if (theInstance == null) {
       theInstance = new DemandVariableValueQuery(flowgraph, solver);
     }

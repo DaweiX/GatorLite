@@ -59,10 +59,6 @@ public abstract class NNode {
 		}
 	}
 
-	public synchronized int getNumberOfSuccessors() {
-		return (succ == null ? 0 : succ.size());
-	}
-
 	public synchronized NNode getSuccessor(int index) {
 		return succ.get(index);
 	}
@@ -73,14 +69,6 @@ public abstract class NNode {
 		} else {
 			return Lists.newArrayList(pred);
 		}
-	}
-
-	public synchronized int getNumberOfPredecessors() {
-		return (pred == null ? 0 : pred.size());
-	}
-
-	public synchronized NNode getPredecessor(int index) {
-		return pred.get(index);
 	}
 
 	public synchronized boolean hasChild(NNode child) {
@@ -104,22 +92,6 @@ public abstract class NNode {
 		} else {
 			return children;
 		}
-	}
-
-	public synchronized void removeEdgeTo(NNode target) {
-		if (succ != null && succ.contains(target)) {
-			succ.remove(target);
-			numberOfEdges--;
-		} else {
-			if (target.pred != null && target.pred.contains(this)) {
-				throw new RuntimeException("Broken edge " + this + "===>" + target);
-			}
-			return;
-		}
-		if (target.pred == null || !target.pred.contains(this)) {
-			throw new RuntimeException("Broken edge " + this + "===>" + target);
-		}
-		target.pred.remove(this);
 	}
 
 	public synchronized void addEdgeTo(NNode x) {

@@ -6,7 +6,7 @@
  * This file is distributed under the terms described in LICENSE in the
  * root directory.
  */
-package presto.android.gui.clients;
+package presto.android.gui;
 
 import java.io.File;
 import java.io.PrintStream;
@@ -122,8 +122,6 @@ public class GUIHierarchyPrinterClient {
         String type = String.format(" type=\"%s\"", view.type);
         String id = String.format(" id=\"%d\"", view.id);
         String idName = String.format(" idName=\"%s\"", view.idName);
-        // TODO(tony): add the text attribute for TextView and so on
-        String text = "";
         // title for MenuItem
         String title = "";
         if (view.title != null) {
@@ -133,34 +131,30 @@ public class GUIHierarchyPrinterClient {
             title = String.format(" title=\"%s\"", xmlSafe(view.title));
         }
         String head =
-                String.format("<View%s%s%s%s%s>\n", type, id, idName, text, title);
+                String.format("<View%s%s%s%s>\n", type, id, idName, title);
         printf(head);
 
-        {
-            // This includes both children and context menus
-            for (View child : view.views) {
-                indent += 2;
-                printView(child);
-                indent -= 2;
-            }
-            // Events and handlers
-            for (EventAndHandler eventAndHandler : view.eventAndHandlers) {
-                indent += 2;
-                String handler = eventAndHandler.handler;
-                String safeRealHandler = "";
-                if (handler.startsWith("<FakeName_")) {
-                    SootMethod fake = Scene.v().getMethod(handler);
-                    SootMethod real = output.getRealHandler(fake);
-                    safeRealHandler = String.format(
-                            " realHandler=\"%s\"", xmlSafe(real.getSignature()));
-                }
-                printf("<EventAndHandler event=\"%s\" handler=\"%s\"%s />\n",
-                        eventAndHandler.event, xmlSafe(eventAndHandler.handler), safeRealHandler);
-                indent -= 2;
-            }
+        // This includes both children and context menus
+        for (View child : view.views) {
+            indent += 2;
+            printView(child);
+            indent -= 2;
         }
-
-        String tail = "</View>\n";
-        printf(tail);
+        // Events and handlers
+        for (EventAndHandler eventAndHandler : view.eventAndHandlers) {
+            indent += 2;
+            String handler = eventAndHandler.handler;
+            String safeRealHandler = "";
+            if (handler.startsWith("<FakeName_")) {
+                SootMethod fake = Scene.v().getMethod(handler);
+                SootMethod real = output.getRealHandler(fake);
+                safeRealHandler = String.format(
+                        " realHandler=\"%s\"", xmlSafe(real.getSignature()));
+            }
+            printf("<EventAndHandler event=\"%s\" handler=\"%s\"%s />\n",
+                    eventAndHandler.event, xmlSafe(eventAndHandler.handler), safeRealHandler);
+            indent -= 2;
+        }
+        printf("</View>\n");
     }
 }

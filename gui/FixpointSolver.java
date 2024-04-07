@@ -8,11 +8,7 @@
  */
 package presto.android.gui;
 
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.LinkedList;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 import presto.android.*;
 import presto.android.gui.graph.NActivityNode;
@@ -56,8 +52,6 @@ import soot.RefType;
 import soot.Scene;
 import soot.SootClass;
 import soot.SootMethod;
-
-import com.google.common.collect.Iterators;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
@@ -69,7 +63,7 @@ import com.google.common.collect.Sets;
  * efficient.
  */
 public class FixpointSolver {
-    public Flowgraph flowgraph;
+    public FlowGraph flowgraph;
 
     JimpleUtil jimpleUtil;
     GraphUtil graphUtil;
@@ -119,7 +113,7 @@ public class FixpointSolver {
     public Map<NNode, Set<NOpNode>> viewProducers;
     public Map<NObjectNode, Set<NIdNode>> viewLayoutIds;
 
-    public FixpointSolver(Flowgraph g) {
+    public FixpointSolver(FlowGraph g) {
         this.flowgraph = g;
         this.graphUtil = GraphUtil.v();
         this.hier = Hierarchy.v();
@@ -127,16 +121,6 @@ public class FixpointSolver {
     }
 
     public void solve() {
-        // Pre
-        preSolveInit();
-
-        solveCore();
-    }
-
-    // TODO: move this to field decl section. There is no point doing it here
-    // rather than there.
-    public void preSolveInit() {
-        // init
         reachingLayoutIds = Maps.newHashMap();
         reachingMenuIds = Maps.newHashMap();
 
@@ -159,13 +143,15 @@ public class FixpointSolver {
 
         solutionListeners = Maps.newHashMap();
         for (NOpNode n : NOpNode.getNodes(NSetListenerOpNode.class)) {
-            solutionListeners.put(n, new HashSet<NNode>());
+            solutionListeners.put(n, new HashSet<>());
         }
 
         activityRoots = Maps.newHashMap();
 
         viewProducers = Maps.newHashMap();
         viewLayoutIds = Maps.newHashMap();
+
+        solveCore();
     }
 
     void computePathsFromViewProducerToViewConsumer() {
@@ -184,21 +170,23 @@ public class FixpointSolver {
     }
 
     public void solveCore() {
-        // compute
+        System.out.println("    Solve: 1");
         layoutIdReachability();
         menuIdReachability();
-
         windowReachability();
         optionsMenuReachability();
         contextMenuReachability();
         viewIdReachability();
 
+        System.out.println("    Solve: 2");
         computePathsFromViewProducerToViewConsumer();
 
-        // process inflater calls
-        processInflaterCalls();
+        // process inflate calls
+        System.out.println("    Solve: 3");
+        processInflateCalls();
 
         // propagation
+        System.out.println("    Solve: 4");
         viewAndListenerPropagation();
     }
 
@@ -315,7 +303,7 @@ public class FixpointSolver {
         }
     }
 
-    void reverseReachbility(Map<NOpNode, Set<NNode>> map, Map<NOpNode, Set<NOpNode>> reverseMap) {
+    void reverseReachability(Map<NOpNode, Set<NNode>> map, Map<NOpNode, Set<NOpNode>> reverseMap) {
         for (Map.Entry<NOpNode, Set<NNode>> entry : map.entrySet()) {
             NOpNode target = entry.getKey();
             for (NNode n : entry.getValue()) {
@@ -334,15 +322,15 @@ public class FixpointSolver {
     }
 
     void reverseParameterReachability() {
-        reverseReachbility(reachingParameterViews, reachedParameterViews);
+        reverseReachability(reachingParameterViews, reachedParameterViews);
     }
 
     void reverseReceiverReachability() {
-        reverseReachbility(reachingReceiverViews, reachedReceiverViews);
+        reverseReachability(reachingReceiverViews, reachedReceiverViews);
     }
 
     void reverseListenerReachability() {
-        reverseReachbility(reachingListeners, reachedListeners);
+        reverseReachability(reachingListeners, reachedListeners);
     }
 
     /**
@@ -390,11 +378,7 @@ public class FixpointSolver {
                 }
                 NOpNode opNode = (NOpNode) target;
                 if (opNode.consumesMenuId()) {
-                    Set<NMenuIdNode> menus = reachingMenuIds.get(opNode);
-                    if (menus == null) {
-                        menus = Sets.newHashSet();
-                        reachingMenuIds.put(opNode, menus);
-                    }
+                    Set<NMenuIdNode> menus = reachingMenuIds.computeIfAbsent(opNode, k -> Sets.newHashSet());
                     menus.add(menuIdNode);
                 } else {
                     // TODO Temp workaround for variable reuse issue
@@ -443,14 +427,11 @@ public class FixpointSolver {
                     }
                     optionsMenus.add(optionsMenu);
                 } else {
-                    // throw new RuntimeException("OptionsMenu Reached " +
-                    // opNode.toString());
                     String fullClassName = Thread.currentThread().getStackTrace()[2].getClassName();
                     String methodName = Thread.currentThread().getStackTrace()[2].getMethodName();
                     int lineNumber = Thread.currentThread().getStackTrace()[2].getLineNumber();
                     Logger.verb("WARNING", String.format("OptionsMenu Reached %s at %s at %s at line %d",
                             opNode, fullClassName, methodName, lineNumber));
-                    continue;
                 }
             }
         }
@@ -619,11 +600,6 @@ public class FixpointSolver {
         }
     }
 
-    public Map<NObjectNode, Set<NIdNode>> getViewToLayoutIds(){
-        return viewLayoutIds;
-    }
-
-
     // ==== inflater calls
     XMLParser xmlParser;
     Hierarchy hier;
@@ -641,19 +617,8 @@ public class FixpointSolver {
         flows.add(producerNode);
     }
 
-    public Iterator<NOpNode> findProducers(NNode objectNode) {
-        Set<NOpNode> set = viewProducers.get(objectNode);
-        if (set == null || set.isEmpty()) {
-            return Iterators.emptyIterator();
-        } else {
-            return set.iterator();
-        }
-    }
-
-    void processInflaterCalls() {
-        // init
+    void processInflateCalls() {
         xmlParser = XMLParser.Factory.getXMLParser();
-
         processViewInflaterCalls();
         processMenuInflaterCalls();
     }
@@ -716,9 +681,6 @@ public class FixpointSolver {
                         viewLayoutIds.get(windowNode).add(layoutIdNode);
 
                     }
-                } else if (!(opNode instanceof NSetIdOpNode)) {
-                    if (Configs.sanityCheck)
-                        throw new RuntimeException();
                 }
             }
         }
@@ -820,7 +782,6 @@ public class FixpointSolver {
                 if (m.isConstructor()) {
                     NVarNode thisNode = flowgraph.varNode(jimpleUtil.thisLocal(m));
                     inflNode.addEdgeTo(thisNode);
-                    continue;
                 }
             }
             // Try to find onCreateContextMenu
@@ -941,8 +902,6 @@ public class FixpointSolver {
             }
 
             vNode.addParent(parent);
-            // System.out.println("[MenuInflate] " + vNode + "--parent-->" +
-            // parent);
             for (Iterator<AndroidView> it = v.getChildren(); it.hasNext();) {
                 worklist.add(it.next());
                 nodeWorklist.add(vNode);
@@ -950,7 +909,7 @@ public class FixpointSolver {
         } // worklist not empty
     }
 
-    NInflNode doLayoutInflate(Integer layoutId, NNode rootparent) {
+    NInflNode doLayoutInflate(Integer layoutId, NNode rootParent) {
         // Step 1: create nodes and edges to represent the widget hierarchy
         AndroidView root = getRootForLayoutId(layoutId);
         NInflNode rootNode = null;
@@ -958,11 +917,10 @@ public class FixpointSolver {
         LinkedList<AndroidView> worklist = Lists.newLinkedList();
         LinkedList<NNode> nodeWorklist = Lists.newLinkedList();
         worklist.add(root);
-        nodeWorklist.add(rootparent);
+        nodeWorklist.add(rootParent);
         while (!worklist.isEmpty()) {
             AndroidView v = worklist.remove();
             NNode parent = nodeWorklist.remove();
-            // TODO: Debug check if the SootClass of AndroidView is null
             if (v.getSootClass() == null) {
                 Logger.verb("DEBUG", "AndroidView " + v.getText() + " " + v.getId() + " " + v.getOrigin() + " "
                         + "SootClass is" + " null");
@@ -1060,7 +1018,6 @@ public class FixpointSolver {
             for (NOpNode setListener : NOpNode.getNodes(NSetListenerOpNode.class)) {
                 if (processSetListener((NSetListenerOpNode) setListener)) {
                     changed = true;
-                    // recompute the paths
                     computePathsFromViewProducerToViewConsumer();
                 }
             }
@@ -1308,11 +1265,9 @@ public class FixpointSolver {
             return false;
         }
         NNode textNode = node.getParameter();
-        boolean resolved = false;
         boolean changed = false;
         for (NNode n : graphUtil.backwardReachableNodes(textNode)) {
             if (n instanceof NStringConstantNode || n instanceof NStringIdNode) {
-                resolved = true;
                 for (NNode receiver : receiverSet) {
                     if (receiver.addTextNode(n)) {
                         changed = true;
@@ -1347,7 +1302,6 @@ public class FixpointSolver {
     }
 
     boolean processSetListener(NSetListenerOpNode node) {
-        boolean changed = false;
         Set<NNode> viewSet = solutionReceivers.get(node);
         if (viewSet == null || viewSet.isEmpty()) {
             return false;
@@ -1362,11 +1316,11 @@ public class FixpointSolver {
             for (NNode listener : listenerSet) {
                 NObjectNode listenerObject = (NObjectNode) listener;
                 if (flowgraph.processSetListenerOpNode(node, viewObject, listenerObject)) {
-                    changed = true;
+                    return true;
                 }
             }
         }
-        return changed;
+        return false;
     }
 
     void propagateViewToParameter(Set<NNode> solution, NOpNode node, Map<NOpNode, Set<NOpNode>> reachedMap,
@@ -1383,11 +1337,7 @@ public class FixpointSolver {
                         trueSolution.add(s);
                     }
                 }
-                Set<NNode> parameterSolutionSet = solutionMap.get(call);
-                if (parameterSolutionSet == null) {
-                    parameterSolutionSet = Sets.newHashSet();
-                    solutionMap.put(call, parameterSolutionSet);
-                }
+                Set<NNode> parameterSolutionSet = solutionMap.computeIfAbsent(call, k -> Sets.newHashSet());
                 parameterSolutionSet.addAll(trueSolution);
             }
         }
@@ -1409,11 +1359,7 @@ public class FixpointSolver {
                         trueSolution.add(s);
                     }
                 }
-                Set<NNode> receiverSolutionSet = solutionReceivers.get(call);
-                if (receiverSolutionSet == null) {
-                    receiverSolutionSet = Sets.newHashSet();
-                    solutionReceivers.put(call, receiverSolutionSet);
-                }
+                Set<NNode> receiverSolutionSet = solutionReceivers.computeIfAbsent(call, k -> Sets.newHashSet());
                 receiverSolutionSet.addAll(trueSolution);
             }
         }
@@ -1440,7 +1386,7 @@ public class FixpointSolver {
 
     // type-based filter
     boolean isValidFlowByType(NNode solutionNode, NOpNode call, VarType type) {
-        NVarNode targetNode = null;
+        NVarNode targetNode;
         if (type == VarType.Parameter) {
             targetNode = (NVarNode) call.getParameter();
         } else if (type == VarType.Receiver) {
@@ -1450,7 +1396,7 @@ public class FixpointSolver {
         } else {
             throw new RuntimeException();
         }
-        SootClass sourceType = null;
+        SootClass sourceType;
         if (solutionNode instanceof NViewAllocNode) {
             sourceType = ((NViewAllocNode) solutionNode).c;
             if (sourceType == null) {
@@ -1483,7 +1429,7 @@ public class FixpointSolver {
             Logger.verb("ERROR", "in isCompatible, high is null, low is " + low);
         } else if (low == null && high != null) {
             Logger.verb("ERROR", "in isCompatible, low is null, high is " + high);
-        } else if (low == null && high == null) {
+        } else if (low == null) {
             Logger.verb("ERROR", "in isCompatible, both is null");
         }
         if (high.equals(low)) {
@@ -1503,10 +1449,6 @@ public class FixpointSolver {
         return false;
     }
 
-    public Set<NOpNode> getOpNodes(Class<? extends NOpNode> type) {
-        return NOpNode.getNodes(type);
-    }
-
     enum VarType {
         Parameter, Receiver, ReturnValue,
     }
@@ -1515,24 +1457,6 @@ public class FixpointSolver {
         NVarNode extract(NOpNode opNode);
     }
 
-    final VarExtractor parameterExtractor = new VarExtractor() {
-        @Override
-        public NVarNode extract(NOpNode opNode) {
-            return (NVarNode) opNode.getParameter();
-        }
-    };
+    final VarExtractor resultExtractor = NOpNode::getLhs;
 
-    final VarExtractor resultExtractor = new VarExtractor() {
-        @Override
-        public NVarNode extract(NOpNode opNode) {
-            return opNode.getLhs();
-        }
-    };
-
-    final VarExtractor receiverExtractor = new VarExtractor() {
-        @Override
-        public NVarNode extract(NOpNode opNode) {
-            return opNode.getReceiver();
-        }
-    };
 }

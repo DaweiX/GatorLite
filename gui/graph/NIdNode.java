@@ -10,7 +10,6 @@ package presto.android.gui.graph;
 
 import presto.android.gui.IDNameExtractor;
 
-// TODO(tony): move the toString() implementation up into this class.
 public abstract class NIdNode extends NNode {
   protected Integer i;
   protected String tag;

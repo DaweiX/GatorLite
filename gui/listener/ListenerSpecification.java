@@ -276,9 +276,8 @@ public class ListenerSpecification {
                 throw new RuntimeException(
                         "Class " + guiClass + " specified more than once!");
             }
-//      System.out.println("GUI: " + type);
+
             if (guiClass.isPhantom()) {
-//        System.out.println("  !!! Phantom !!!");
                 continue;
             }
             NodeList events = gui.getChildNodes();

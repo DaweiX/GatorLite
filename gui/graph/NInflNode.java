@@ -20,16 +20,16 @@ public class NInflNode extends NObjectNode {
 
   @Override
   public String toString() {
-    String p = "";
+    StringBuilder p = new StringBuilder();
     if (parents == null) {
-      p = "*]";
+      p = new StringBuilder("*]");
     } else if (parents.size() == 1) {
-      p = parents.iterator().next().id + "]";
+      p = new StringBuilder(parents.iterator().next().id + "]");
     } else {
       for (NNode n : parents) {
-        p += n.id + ";";
+        p.append(n.id).append(";");
       }
-      p += "]";
+      p.append("]");
     }
     return "INFL[" + c + "," + (idNode == null ? "*" : idNode) + "," + p + id;
   }
