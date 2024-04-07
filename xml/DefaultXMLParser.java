@@ -140,6 +140,8 @@ class DefaultXMLParser extends AbstractXMLParser {
 		return intAndStringValues.get(idValue);
 	}
 
+	String ATTR_LAUNCH_MODE = FLOW_DROID_LAYOUT ? "launchMode" : "android:launchMode";
+
 	private static DefaultXMLParser theInst;
 
 	private DefaultXMLParser() {
@@ -238,7 +240,7 @@ class DefaultXMLParser extends AbstractXMLParser {
 						}
 
 						ActivityLaunchMode launchMode = ActivityLaunchMode.standard;
-						Node launchModeNode = m.getNamedItem("launchMode");
+						Node launchModeNode = m.getNamedItem(ATTR_LAUNCH_MODE);
 						if (launchModeNode != null) {
 							if (!FLOW_DROID_LAYOUT) {
 								launchMode = ActivityLaunchMode.valueOf(launchModeNode.getTextContent());
