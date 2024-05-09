@@ -12,9 +12,11 @@ public class MethodHelper {
     private PatchingChain<Unit> units;
 
     public MethodHelper(SootMethod sootMethod) {
-        Body body = sootMethod.getActiveBody();
-        if (body != null) {
-            units = body.getUnits();
+        if (sootMethod.hasActiveBody()) {
+            Body body = sootMethod.getActiveBody();
+            if (body != null) {
+                units = body.getUnits();
+            }
         }
     }
 
@@ -25,6 +27,7 @@ public class MethodHelper {
     public String getUIIdFromSetListenerStmt(Stmt s) {
         // first, we check whether the ui is specified
         // by a class field, if so, return the field name
+        if (isEmpty()) return null;
         InvokeExpr invokeExpr = s.getInvokeExpr();
         if (!InstanceInvokeExpr.class.isAssignableFrom(invokeExpr.getClass())) return null;
         Value value = ((InstanceInvokeExpr) invokeExpr).getBaseBox().getValue();
@@ -56,6 +59,7 @@ public class MethodHelper {
 
     public Set<Pair<String, String>> getClassField() {
         Set<Pair<String, String>> classIdName = new HashSet<>();
+        if (isEmpty()) return classIdName;
         Value currentVarName = null;
         String idDeg = null;
         for (Unit unit : units) {
