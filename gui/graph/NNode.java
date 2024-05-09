@@ -30,12 +30,7 @@ public abstract class NNode {
 	// or null for nodes without ids (or sometimes, weirdly, NLayoutIdNode)
 	public NIdNode idNode;
 
-	// The displayed text for this GUI object. Right now, only valid for the
-	// NInflNode nodes representing menu items.
-	private Set<NNode> textNodes;
-	private Set<NNode> drawableNodes;
-
-	public NNode() {
+    public NNode() {
 		nextId++;
 		id = nextId;
 	}
@@ -141,26 +136,5 @@ public abstract class NNode {
 			p.children = Sets.newHashSet();
 		}
 		p.children.add(this);
-	}
-
-	public synchronized boolean addTextNode(NNode text) {
-		if (textNodes == null) {
-			textNodes = Sets.newHashSet();
-		}
-		return textNodes.add(text);
-	}
-
-	public synchronized boolean addDrawableNode(NNode drawable) {
-		if (drawableNodes == null) {
-			drawableNodes = Sets.newHashSet();
-		}
-		return drawableNodes.add(drawable);
-	}
-
-	public synchronized Iterator<NNode> getTextNodes() {
-		if (textNodes == null) {
-			return Iterators.emptyIterator();
-		}
-		return textNodes.iterator();
 	}
 }

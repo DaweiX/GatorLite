@@ -11,13 +11,13 @@ package presto.android.gui;
 import java.util.*;
 
 import presto.android.*;
+import presto.android.Hierarchy;
 import presto.android.gui.graph.NActivityNode;
 import presto.android.gui.graph.NAddView1OpNode;
 import presto.android.gui.graph.NAddView2OpNode;
 import presto.android.gui.graph.NAnonymousIdNode;
 import presto.android.gui.graph.NContextMenuNode;
 import presto.android.gui.graph.NDialogNode;
-import presto.android.gui.graph.NDrawableIdNode;
 import presto.android.gui.graph.NFindView1OpNode;
 import presto.android.gui.graph.NFindView1OpNode.FindView1Type;
 import presto.android.gui.graph.NFindView2OpNode;
@@ -36,11 +36,7 @@ import presto.android.gui.graph.NObjectNode;
 import presto.android.gui.graph.NOpNode;
 import presto.android.gui.graph.NOptionsMenuNode;
 import presto.android.gui.graph.NSetIdOpNode;
-import presto.android.gui.graph.NSetImageResourceOpNode;
 import presto.android.gui.graph.NSetListenerOpNode;
-import presto.android.gui.graph.NSetTextOpNode;
-import presto.android.gui.graph.NStringConstantNode;
-import presto.android.gui.graph.NStringIdNode;
 import presto.android.gui.graph.NVarNode;
 import presto.android.gui.graph.NViewAllocNode;
 import presto.android.gui.graph.NWidgetIdNode;
@@ -48,13 +44,12 @@ import presto.android.gui.graph.NWindowNode;
 import presto.android.gui.listener.ListenerSpecification;
 import presto.android.xml.AndroidView;
 import presto.android.xml.XMLParser;
-import soot.RefType;
-import soot.Scene;
-import soot.SootClass;
-import soot.SootMethod;
+import soot.*;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
+import soot.jimple.Stmt;
+import soot.toolkits.scalar.Pair;
 
 /**
  * Fixed-point computation to resolve the mutual-dependence between NOpNode
@@ -112,12 +107,14 @@ public class FixpointSolver {
 
     public Map<NNode, Set<NOpNode>> viewProducers;
     public Map<NObjectNode, Set<NIdNode>> viewLayoutIds;
+    public Map<SootClass, Set<Pair<String, String>>> class2IdName;
 
     public FixpointSolver(FlowGraph g) {
         this.flowgraph = g;
         this.graphUtil = GraphUtil.v();
         this.hier = Hierarchy.v();
         this.jimpleUtil = JimpleUtil.v(this.hier);
+        this.class2IdName = new HashMap<>();
     }
 
     public void solve() {
@@ -222,32 +219,27 @@ public class FixpointSolver {
     // AddView2, SetId, SetText, FindView1, FindView3
     void solutionReceiverReachability() {
         for (Map.Entry<NOpNode, Set<NNode>> entry : reachingReceiverViews.entrySet()) {
-            NOpNode key = entry.getKey();
-            Set<NNode> value = solutionReceivers.get(key);
-            for (NNode n : entry.getValue()) {
-                if (!(n instanceof NObjectNode)) {
+            NOpNode src = entry.getKey();
+            Set<NNode> receivers = solutionReceivers.get(src);
+            for (NNode tgt : entry.getValue()) {
+                if (!(tgt instanceof NObjectNode)) {
                     continue;
                 }
-                if (!isValidFlowByType(n, key, VarType.Receiver)) {
+                if (!isValidFlowByType(tgt, src, VarType.Receiver)) {
                     continue;
                 }
-                if (n instanceof NViewAllocNode || n instanceof NOptionsMenuNode || n instanceof NContextMenuNode) {
-                    if (value == null) {
-                        value = Sets.newHashSet();
-                        solutionReceivers.put(key, value);
+                if (tgt instanceof NViewAllocNode || tgt instanceof NOptionsMenuNode ||
+                        tgt instanceof NContextMenuNode || tgt instanceof NInflNode) {
+                    if (receivers == null) {
+                        receivers = Sets.newHashSet();
+                        solutionReceivers.put(src, receivers);
                     }
-                    value.add(n);
-                } else if (n instanceof NInflNode) {
-                    if (value == null) {
-                        value = Sets.newHashSet();
-                        solutionReceivers.put(key, value);
-                    }
-                    value.add(n);
+                    receivers.add(tgt);
                 } else {
                     if (Configs.sanityCheck) {
-                        throw new RuntimeException("Unhandled reaching receiver at " + key + " for " + n);
+                        throw new RuntimeException("Unhandled reaching receiver at " + src + " for " + tgt);
                     } else {
-                        Logger.verb("WARNING", "Unhandled reaching receiver at " + key + " for " + n);
+                        Logger.verb("WARNING", "Unhandled reaching receiver at " + src + " for " + tgt);
                     }
                 }
             }
@@ -268,11 +260,7 @@ public class FixpointSolver {
             return;
         }
         for (NOpNode n : nodes) {
-            Set<NNode> solutions = solutionResults.get(n);
-            if (solutions == null) {
-                solutions = Sets.newHashSet();
-                solutionResults.put(n, solutions);
-            }
+            solutionResults.computeIfAbsent(n, k -> Sets.newHashSet());
         }
     }
 
@@ -311,11 +299,7 @@ public class FixpointSolver {
                     continue;
                 }
                 NOpNode source = (NOpNode) n;
-                Set<NOpNode> targetSet = reverseMap.get(source);
-                if (targetSet == null) {
-                    targetSet = Sets.newHashSet();
-                    reverseMap.put(source, targetSet);
-                }
+                Set<NOpNode> targetSet = reverseMap.computeIfAbsent(source, k -> Sets.newHashSet());
                 targetSet.add(target);
             }
         }
@@ -348,11 +332,7 @@ public class FixpointSolver {
                 NOpNode opNode = (NOpNode) target;
                 // NOTE: setId() could use layout id as parameter as well.
                 if (opNode.consumesLayoutId()) {
-                    Set<NLayoutIdNode> layouts = reachingLayoutIds.get(opNode);
-                    if (layouts == null) {
-                        layouts = Sets.newHashSet();
-                        reachingLayoutIds.put(opNode, layouts);
-                    }
+                    Set<NLayoutIdNode> layouts = reachingLayoutIds.computeIfAbsent(opNode, k -> Sets.newHashSet());
                     layouts.add(layoutIdNode);
                 } else {
                     // TODO Temp workaround for variable reuse issue
@@ -420,11 +400,7 @@ public class FixpointSolver {
                 NOpNode opNode = (NOpNode) target;
                 if (opNode instanceof NFindView1OpNode || opNode instanceof NFindView3OpNode
                         || opNode instanceof NAddView2OpNode || opNode instanceof NMenuInflateOpNode) {
-                    Set<NOptionsMenuNode> optionsMenus = reachingOptionsMenus.get(opNode);
-                    if (optionsMenus == null) {
-                        optionsMenus = Sets.newHashSet();
-                        reachingOptionsMenus.put(opNode, optionsMenus);
-                    }
+                    Set<NOptionsMenuNode> optionsMenus = reachingOptionsMenus.computeIfAbsent(opNode, k -> Sets.newHashSet());
                     optionsMenus.add(optionsMenu);
                 } else {
                     String fullClassName = Thread.currentThread().getStackTrace()[2].getClassName();
@@ -452,11 +428,7 @@ public class FixpointSolver {
             NOpNode opNode = (NOpNode) target;
             if (opNode instanceof NFindView1OpNode || opNode instanceof NFindView3OpNode
                     || opNode instanceof NAddView2OpNode || opNode instanceof NMenuInflateOpNode) {
-                Set<NContextMenuNode> contextMenus = reachingContextMenus.get(opNode);
-                if (contextMenus == null) {
-                    contextMenus = Sets.newHashSet();
-                    reachingContextMenus.put(opNode, contextMenus);
-                }
+                Set<NContextMenuNode> contextMenus = reachingContextMenus.computeIfAbsent(opNode, k -> Sets.newHashSet());
                 contextMenus.add(contextMenu);
                 opNodes.add(opNode);
             } else {
@@ -475,11 +447,7 @@ public class FixpointSolver {
                 NOpNode opNode = (NOpNode) target;
                 if (opNode instanceof NFindView1OpNode || opNode instanceof NFindView2OpNode
                         || opNode instanceof NSetIdOpNode) {
-                    Set<NIdNode> views = reachingViewIds.get(opNode);
-                    if (views == null) {
-                        views = Sets.newHashSet();
-                        reachingViewIds.put(opNode, views);
-                    }
+                    Set<NIdNode> views = reachingViewIds.computeIfAbsent(opNode, k -> Sets.newHashSet());
                     views.add(viewIdNode);
                 }
             }
@@ -525,10 +493,11 @@ public class FixpointSolver {
             }
         }
         // patch in some special cases
+
         // OptionsMenu as receiver
-        propagateOptionsMenuToReceivers();
+         propagateOptionsMenuToReceivers();
         // ContextMenu as receiver
-        propagateContextMenuToReceivers();
+         propagateContextMenuToReceivers();
     }
 
     void propagateOptionsMenuToReceivers() {
@@ -537,11 +506,7 @@ public class FixpointSolver {
             if (key instanceof NMenuInflateOpNode) {
                 continue;
             }
-            Set<NNode> set = reachingReceiverViews.get(key);
-            if (set == null) {
-                set = Sets.newHashSet();
-                reachingReceiverViews.put(key, set);
-            }
+            Set<NNode> set = reachingReceiverViews.computeIfAbsent(key, k -> Sets.newHashSet());
             set.addAll(entry.getValue());
         }
     }
@@ -557,27 +522,70 @@ public class FixpointSolver {
         }
     }
 
+    // DDDD
     void parameterAndReceiverViewReachability(NNode source) {
-        Set<NNode> reachables = graphUtil.reachableNodes(source);
-        for (NNode target : reachables) {
+        Set<NNode> reachableNodes = graphUtil.reachableNodes(source);
+        for (NNode target : reachableNodes) {
             if (!(target instanceof NOpNode)) {
                 continue;
             }
             NOpNode opNode = (NOpNode) target;
             // View as parameter
             if (opNode instanceof NAddView1OpNode
-                    || (opNode instanceof NAddView2OpNode && reachables.contains(opNode.getParameter()))) {
+                    || (opNode instanceof NAddView2OpNode && reachableNodes.contains(opNode.getParameter()))) {
                 MultiMapUtil.addKeyAndHashSetElement(reachingParameterViews, opNode, source);
             } else {
                 // Maybe SetListener
-                listenerReachability(source, opNode, reachables);
+                listenerReachability(source, opNode, reachableNodes);
             }
             // View as receiver
             if (opNode instanceof NFindView1OpNode || opNode instanceof NFindView3OpNode
-                    || opNode instanceof NSetIdOpNode || opNode instanceof NSetTextOpNode
-                    || opNode instanceof NSetImageResourceOpNode
-                    || (opNode instanceof NSetListenerOpNode && reachables.contains(opNode.getReceiver()))
-                    || (opNode instanceof NAddView2OpNode && reachables.contains(opNode.getReceiver()))) {
+                    || opNode instanceof NSetIdOpNode) {
+                MultiMapUtil.addKeyAndHashSetElement(reachingReceiverViews, opNode, source);
+            } else if (opNode instanceof NSetListenerOpNode) {
+                SootMethod call = opNode.callSite.getO2();
+                MethodHelper mh = new MethodHelper(call);
+                SootClass klass = call.getDeclaringClass();
+                if (!class2IdName.containsKey(klass)) {
+                    class2IdName.put(klass, mh.getClassField());
+                }
+                Stmt s = opNode.callSite.getO1();
+                String uiIdFromUnit = mh.getUIIdFromSetListenerStmt(s);
+                if (uiIdFromUnit == null) //noinspection SpellCheckingInspection
+                {
+                    // TODO: currently we do not handle this.viewXYZ.setListener()
+                    // $r0 := @this: com.applovin.impl.adview.az
+                    // $r10 = $r0.<com.applovin.impl.adview.az: android.view.View B>
+                    // $r13 = new com.applovin.impl.adview.y
+                    // specialinvoke $r13.<com.applovin.impl.adview.y: void <init>(com.applovin.impl.adview.az)>($r0)
+                    // virtualinvoke $r10.<android.view.View: void setOnClickListener(android.view.View$OnClickListener)>($r13)
+                    continue;
+                }
+
+                if (!uiIdFromUnit.chars().allMatch(Character::isDigit)) {
+                    // if is a field name, we should turn it to numeric id
+                    Set<Pair<String, String>> tuple2s = class2IdName.get(klass);
+                    if (tuple2s == null) {
+                        continue;
+                    }
+                    for (Pair<String, String> tuple2 : tuple2s) {
+                        String id = tuple2.getO1();
+                        String name = tuple2.getO2();
+                        if (uiIdFromUnit.equals(name)) {
+                            uiIdFromUnit = id;
+                            break;
+                        }
+                    }
+                }
+
+                NVarNode receiver = opNode.getReceiver();
+                if (!reachableNodes.contains(receiver)) continue;
+                if (source.toString().contains(uiIdFromUnit)) {
+                    MultiMapUtil.addKeyAndHashSetElement(reachingReceiverViews, opNode, source);
+                }
+            } else if (opNode instanceof NAddView2OpNode) {
+                NVarNode receiver = opNode.getReceiver();
+                if (!reachableNodes.contains(receiver)) continue;
                 MultiMapUtil.addKeyAndHashSetElement(reachingReceiverViews, opNode, source);
             }
         }
@@ -609,18 +617,14 @@ public class FixpointSolver {
     // we only handle NInflNode, but in general we need to cover other types of
     // nodes (e.g., NViewAllocNode) as well.
     void recordViewProducers(NNode objectNode, NOpNode producerNode) {
-        Set<NOpNode> flows = viewProducers.get(objectNode);
-        if (flows == null) {
-            flows = Sets.newHashSet();
-            viewProducers.put(objectNode, flows);
-        }
+        Set<NOpNode> flows = viewProducers.computeIfAbsent(objectNode, k -> Sets.newHashSet());
         flows.add(producerNode);
     }
 
     void processInflateCalls() {
         xmlParser = XMLParser.Factory.getXMLParser();
-        processViewInflaterCalls();
-        processMenuInflaterCalls();
+        processViewInflateCalls();
+        processMenuInflateCalls();
     }
 
     void addViewToWindowRoot(NWindowNode window, NNode rootView) {
@@ -638,15 +642,11 @@ public class FixpointSolver {
     }
 
     <E extends NWindowNode> void addViewToWindowRoot(Map<E, Set<NNode>> roots, E window, NNode rootView) {
-        Set<NNode> rootSet = roots.get(window);
-        if (rootSet == null) {
-            rootSet = Sets.newHashSet();
-            roots.put(window, rootSet);
-        }
+        Set<NNode> rootSet = roots.computeIfAbsent(window, k -> Sets.newHashSet());
         rootSet.add(rootView);
     }
 
-    void processViewInflaterCalls() {
+    void processViewInflateCalls() {
         for (Map.Entry<NOpNode, Set<NLayoutIdNode>> entry : reachingLayoutIds.entrySet()) {
             NOpNode opNode = entry.getKey();
             for (NLayoutIdNode layoutIdNode : entry.getValue()) {
@@ -686,7 +686,7 @@ public class FixpointSolver {
         }
     }
 
-    void processMenuInflaterCalls() {
+    void processMenuInflateCalls() {
         for (Map.Entry<NOpNode, Set<NMenuIdNode>> entry : reachingMenuIds.entrySet()) {
             NOpNode opNode = entry.getKey();
             if (!(opNode instanceof NMenuInflateOpNode)) {
@@ -733,11 +733,7 @@ public class FixpointSolver {
                 if (!isValidFlowByType(inflNode, call, VarType.Parameter)) {
                     continue;
                 }
-                Set<NNode> solutions = solution.get(call);
-                if (solutions == null) {
-                    solutions = Sets.newHashSet();
-                    solution.put(call, solutions);
-                }
+                Set<NNode> solutions = solution.computeIfAbsent(call, k -> Sets.newHashSet());
                 solutions.add(inflNode);
             }
         }
@@ -754,25 +750,17 @@ public class FixpointSolver {
                 if (!isValidFlowByType(inflNode, call, VarType.Receiver)) {
                     continue;
                 }
-                Set<NNode> solutions = solutionReceivers.get(call);
-                if (solutions == null) {
-                    solutions = Sets.newHashSet();
-                    solutionReceivers.put(call, solutions);
-                }
+                Set<NNode> solutions = solutionReceivers.computeIfAbsent(call, k -> Sets.newHashSet());
                 solutions.add(inflNode);
             }
         }
     }
 
     /*
-     * There are several effects to consider:
-     *
-     * 1) Connect the node to <this> of constructor. Note that
+     * Connect the node to <this> of constructor. Note that
      * View.<init>(Context) is only called from code, not from inflation.
      * However, let's pretend all constructors could be called to simplify life.
      * This is fine because we only consider application code.
-     *
-     * 2)
      */
     void inflationImplicitEffects(NInflNode inflNode) {
         SootClass c = inflNode.c;
@@ -813,11 +801,7 @@ public class FixpointSolver {
             // View as parameter
             if (opNode instanceof NAddView1OpNode
                     || (opNode instanceof NAddView2OpNode && reachables.contains(opNode.getParameter()))) {
-                Set<NNode> parameterSet = solutionParameters.get(opNode);
-                if (parameterSet == null) {
-                    parameterSet = Sets.newHashSet();
-                    solutionParameters.put(opNode, parameterSet);
-                }
+                Set<NNode> parameterSet = solutionParameters.computeIfAbsent(opNode, k -> Sets.newHashSet());
                 parameterSet.add(inflNode);
             } else if (opNode instanceof NSetListenerOpNode && reachables.contains(opNode.getParameter())) {
                 MultiMapUtil.addKeyAndHashSetElement(solutionListeners, opNode, inflNode);
@@ -828,11 +812,7 @@ public class FixpointSolver {
                     || opNode instanceof NSetIdOpNode
                     || (opNode instanceof NSetListenerOpNode && reachables.contains(opNode.getReceiver()))
                     || (opNode instanceof NAddView2OpNode && reachables.contains(opNode.getReceiver()))) {
-                Set<NNode> receiverSet = solutionReceivers.get(opNode);
-                if (receiverSet == null) {
-                    receiverSet = Sets.newHashSet();
-                    solutionReceivers.put(opNode, receiverSet);
-                }
+                Set<NNode> receiverSet = solutionReceivers.computeIfAbsent(opNode, k -> Sets.newHashSet());
                 receiverSet.add(inflNode);
             }
         }
@@ -893,14 +873,6 @@ public class FixpointSolver {
                 continue;
             }
 
-            String text = v.getText();
-            if (text != null) {
-                // FIXME(tony): we have converted the string ahead of time, and
-                // string
-                // id information is lost.
-                vNode.addTextNode(flowgraph.stringConstantNode(text));
-            }
-
             vNode.addParent(parent);
             for (Iterator<AndroidView> it = v.getChildren(); it.hasNext();) {
                 worklist.add(it.next());
@@ -922,7 +894,7 @@ public class FixpointSolver {
             AndroidView v = worklist.remove();
             NNode parent = nodeWorklist.remove();
             if (v.getSootClass() == null) {
-                Logger.verb("DEBUG", "AndroidView " + v.getText() + " " + v.getId() + " " + v.getOrigin() + " "
+                Logger.verb("DEBUG", "AndroidView " + v.getId() + " " + v.getOrigin() + " "
                         + "SootClass is" + " null");
                 continue;
             }
@@ -951,13 +923,6 @@ public class FixpointSolver {
                 throw new RuntimeException();
             }
 
-            String text = v.getText();
-            if (text != null) {
-                // FIXME(tony): we have converted the string ahead of time, and
-                // string
-                // id information is lost.
-                vNode.addTextNode(flowgraph.stringConstantNode(text));
-            }
             vNode.addParent(parent);
             for (Iterator<AndroidView> it = v.getChildren(); it.hasNext();) {
                 worklist.add(it.next());
@@ -1002,22 +967,11 @@ public class FixpointSolver {
                     changed = true;
                 }
             }
-            for (NOpNode setText : NOpNode.getNodes(NSetTextOpNode.class)) {
-                if (processSetText((NSetTextOpNode) setText)) {
-                    changed = true;
-                }
-            }
-
-            for (NOpNode setImageResource : NOpNode.getNodes(NSetImageResourceOpNode.class)) {
-                if (processSetImageResource((NSetImageResourceOpNode) setImageResource)) {
-                    changed = true;
-                }
-            }
-
             // SetListener: need to recompute path summary if anything changes
             for (NOpNode setListener : NOpNode.getNodes(NSetListenerOpNode.class)) {
                 if (processSetListener((NSetListenerOpNode) setListener)) {
                     changed = true;
+                    // recompute the paths
                     computePathsFromViewProducerToViewConsumer();
                 }
             }
@@ -1240,63 +1194,10 @@ public class FixpointSolver {
         for (NNode receiver : receiverSet) {
             NNode oldIdNode = extractIdNode(receiver);
             if (oldIdNode != null) {
-                // Note that we may be processing the same call in different
-                // iterations
-                // of the fixed-point algorithm. So, there may not be anything
-                // special
-                // happening here.
-                // TODO(tony): we turn off this because it doesn't really tell
-                // us
-                // anything. Turn it back on if necessary.
-                // System.out.println("[WARNING] View id already set for " +
-                // node);
                 continue;
             }
             changed = true;
             setIdNode(receiver, idNode);
-        }
-        return changed;
-    }
-
-    // SetText: view.setText(...) or view.setTitle(...) or ...
-    boolean processSetText(NSetTextOpNode node) {
-        Set<NNode> receiverSet = solutionReceivers.get(node);
-        if (receiverSet == null || receiverSet.isEmpty()) {
-            return false;
-        }
-        NNode textNode = node.getParameter();
-        boolean changed = false;
-        for (NNode n : graphUtil.backwardReachableNodes(textNode)) {
-            if (n instanceof NStringConstantNode || n instanceof NStringIdNode) {
-                for (NNode receiver : receiverSet) {
-                    if (receiver.addTextNode(n)) {
-                        changed = true;
-                    }
-                }
-            }
-        }
-        return changed;
-    }
-
-    // SetImageResource: view.setImageResource(id)
-    boolean processSetImageResource(NSetImageResourceOpNode node) {
-
-        NNode resourceNode = node.getParameter();
-        boolean resolved = false;
-        boolean changed = false;
-
-        Set<NNode> receiverSet = solutionReceivers.get(node);
-        if (receiverSet == null || receiverSet.isEmpty()) {
-            return false;
-        }
-        for (NNode n : graphUtil.backwardReachableNodes(resourceNode)) {
-            if (n instanceof NDrawableIdNode) {
-                for (NNode receiver : receiverSet) {
-                    if (receiver.addDrawableNode(n)) {
-                        changed = true;
-                    }
-                }
-            }
         }
         return changed;
     }
@@ -1431,19 +1332,20 @@ public class FixpointSolver {
             Logger.verb("ERROR", "in isCompatible, low is null, high is " + high);
         } else if (low == null) {
             Logger.verb("ERROR", "in isCompatible, both is null");
-        }
-        if (high.equals(low)) {
-            return true;
-        }
-        if (low.hasSuperclass()) {
-            SootClass parent = low.getSuperclass();
-            if (isCompatible(high, parent)) {
+        } else {
+            if (high.equals(low)) {
                 return true;
             }
-        }
-        for (SootClass parent : low.getInterfaces()) {
-            if (isCompatible(high, parent)) {
-                return true;
+            if (low.hasSuperclass()) {
+                SootClass parent = low.getSuperclass();
+                if (isCompatible(high, parent)) {
+                    return true;
+                }
+            }
+            for (SootClass parent : low.getInterfaces()) {
+                if (isCompatible(high, parent)) {
+                    return true;
+                }
             }
         }
         return false;

@@ -8,25 +8,21 @@
  */
 package presto.android.gui;
 
-import java.util.Collections;
-import java.util.Map;
-import java.util.Set;
-
+import com.google.common.base.Preconditions;
+import com.google.common.collect.Sets;
 import presto.android.Hierarchy;
 import presto.android.gui.FixpointSolver.VarExtractor;
-import presto.android.gui.graph.NIdNode;
 import presto.android.gui.graph.NNode;
 import presto.android.gui.graph.NObjectNode;
 import presto.android.gui.graph.NOpNode;
 import presto.android.gui.graph.NVarNode;
-import presto.android.gui.listener.ListenerSpecification;
-import soot.IntType;
 import soot.Local;
 import soot.RefType;
 import soot.SootClass;
 
-import com.google.common.base.Preconditions;
-import com.google.common.collect.Sets;
+import java.util.Collections;
+import java.util.Map;
+import java.util.Set;
 
 public class DemandVariableValueQuery implements VariableValueQueryInterface {
   private static DemandVariableValueQuery theInstance;
@@ -36,14 +32,12 @@ public class DemandVariableValueQuery implements VariableValueQueryInterface {
 
   private final GraphUtil graphUtil;
   private final Hierarchy hier;
-  private final ListenerSpecification listenerSpec;
 
   DemandVariableValueQuery(FlowGraph flowgraph, FixpointSolver solver) {
     this.flowgraph = flowgraph;
     this.solver = solver;
     this.graphUtil = GraphUtil.v();
     this.hier = Hierarchy.v();
-    this.listenerSpec = ListenerSpecification.v();
   }
 
   public static DemandVariableValueQuery v(
@@ -91,48 +85,11 @@ public class DemandVariableValueQuery implements VariableValueQueryInterface {
   }
 
   @Override
-  public Set<NIdNode> idVariableValues(Local local) {
-    Preconditions.checkArgument(local.getType() instanceof IntType);
-    NVarNode varNode = flowgraph.lookupVarNode(local);
-    if (varNode == null) {
-      return Collections.emptySet();
-    }
-    Set<NIdNode> pts = Sets.newHashSet();
-    for (NNode node : graphUtil.backwardReachableNodes(varNode)) {
-      if (node instanceof NIdNode) {
-        pts.add((NIdNode)node);
-      }
-    }
-    return pts;
-  }
-
-  @Override
-  public Set<NObjectNode> activityVariableValues(Local local) {
-    Preconditions.checkArgument(local.getType() instanceof RefType);
-    SootClass c = ((RefType) local.getType()).getSootClass();
-    if (!hier.applicationActivityClasses.contains(c)
-        && !hier.libActivityClasses.contains(c)) {
-      throw new RuntimeException(c + " is not an Activity");
-    }
-    return valueSetForRefTypes(local);
-  }
-
-  @Override
   public Set<NObjectNode> guiVariableValues(Local local) {
     Preconditions.checkArgument(local.getType() instanceof RefType);
     SootClass c = ((RefType) local.getType()).getSootClass();
     if (!hier.isGUIClass(c)) {
       throw new RuntimeException(c + " is not a GUI type");
-    }
-    return valueSetForRefTypes(local);
-  }
-
-  @Override
-  public Set<NObjectNode> listenerVariableValues(Local local) {
-    Preconditions.checkArgument(local.getType() instanceof RefType);
-    SootClass c = ((RefType) local.getType()).getSootClass();
-    if (!listenerSpec.isListenerType(c)) {
-      throw new RuntimeException(c + " is not a listener type");
     }
     return valueSetForRefTypes(local);
   }

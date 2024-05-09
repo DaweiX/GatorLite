@@ -14,7 +14,6 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 
 import presto.android.Configs;
-import presto.android.gui.GUIAnalysisOutput;
 import presto.android.gui.rep.GUIHierarchy;
 import presto.android.gui.rep.GUIHierarchy.Activity;
 import presto.android.gui.rep.GUIHierarchy.Dialog;
@@ -122,16 +121,8 @@ public class GUIHierarchyPrinterClient {
         String type = String.format(" type=\"%s\"", view.type);
         String id = String.format(" id=\"%d\"", view.id);
         String idName = String.format(" idName=\"%s\"", view.idName);
-        // title for MenuItem
-        String title = "";
-        if (view.title != null) {
-            if (!type.contains("MenuItem")) {
-                throw new RuntimeException(type + " has a title field!");
-            }
-            title = String.format(" title=\"%s\"", xmlSafe(view.title));
-        }
         String head =
-                String.format("<View%s%s%s%s>\n", type, id, idName, title);
+                String.format("<View%s%s%s>\n", type, id, idName);
         printf(head);
 
         // This includes both children and context menus

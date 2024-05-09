@@ -35,7 +35,6 @@ public class GUIHierarchy {
         public String type;
         public int id;
         public String idName;
-        public String title;
         public ArrayList<EventAndHandler> eventAndHandlers = Lists.newArrayList();
 
         public void addEventAndHandlerPair(EventAndHandler eventAndHandler) {

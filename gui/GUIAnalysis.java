@@ -14,8 +14,6 @@ public class GUIAnalysis {
 	public Set<Integer> allMenuIds = Sets.newHashSet();
 	public Set<Integer> allWidgetIds = Sets.newHashSet();
 	public Set<Integer> allStringIds = Sets.newHashSet();
-	public Set<Integer> allDrawableIds = Sets.newHashSet();
-
 	public FlowGraph flowgraph;
 	public FixpointSolver fixpointSolver;
 	public VariableValueQueryInterface variableValueQueryInterface;
@@ -50,7 +48,6 @@ public class GUIAnalysis {
 		allWidgetIds.addAll(xmlParser.getApplicationRIdValues());
 		allWidgetIds.addAll(xmlParser.getSystemRIdValues());
 		allStringIds.addAll(xmlParser.getStringIdValues());
-		allDrawableIds.addAll(xmlParser.getDrawableIdValues());
 
 		System.out.println("[XML] Layout Ids: " + allLayoutIds.size() + ", Menu Ids: " + allMenuIds.size()
 				+ ", Widget Ids: " + allWidgetIds.size() + ", String Ids: " + allStringIds.size());
@@ -66,7 +63,7 @@ public class GUIAnalysis {
 
 		// 1. Build flow graph
 		System.out.println("  - Build flow graph");
-		flowgraph = new FlowGraph(hierarchy, allLayoutIds, allMenuIds, allWidgetIds, allStringIds, allDrawableIds);
+		flowgraph = new FlowGraph(hierarchy, allLayoutIds, allMenuIds, allWidgetIds, allStringIds);
 		flowgraph.build();
 
 		// 2. Fix-point computation

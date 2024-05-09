@@ -100,11 +100,6 @@ public interface XMLParser {
 
   String getRStringName(Integer value);
 
-  String getStringValue(Integer idValue);
-
-  // R.drawable.*
-  Set<Integer> getDrawableIdValues();
-
   // AndroidManifest.xml
   SootClass getMainActivity();
 

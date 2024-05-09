@@ -8,114 +8,25 @@
  */
 package presto.android.gui;
 
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.Map;
-import java.util.Set;
-
+import com.google.common.base.Function;
+import com.google.common.base.Objects;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.*;
+import presto.android.Hierarchy;
 import presto.android.*;
-import presto.android.gui.graph.NActivityNode;
-import presto.android.gui.graph.NAddView1OpNode;
-import presto.android.gui.graph.NAddView2OpNode;
-import presto.android.gui.graph.NAllocNode;
-import presto.android.gui.graph.NAnonymousIdNode;
-import presto.android.gui.graph.NContextMenuNode;
-import presto.android.gui.graph.NDialogNode;
-import presto.android.gui.graph.NDrawableIdNode;
-import presto.android.gui.graph.NFieldNode;
-import presto.android.gui.graph.NFindView1OpNode;
+import presto.android.gui.graph.*;
 import presto.android.gui.graph.NFindView1OpNode.FindView1Type;
-import presto.android.gui.graph.NFindView2OpNode;
-import presto.android.gui.graph.NFindView3OpNode;
 import presto.android.gui.graph.NFindView3OpNode.FindView3Type;
-import presto.android.gui.graph.NInflNode;
-import presto.android.gui.graph.NInflate1OpNode;
-import presto.android.gui.graph.NInflate2OpNode;
-import presto.android.gui.graph.NLayoutIdNode;
-import presto.android.gui.graph.NListenerAllocNode;
-import presto.android.gui.graph.NMenuIdNode;
-import presto.android.gui.graph.NMenuInflateOpNode;
-import presto.android.gui.graph.NMenuItemInflNode;
-import presto.android.gui.graph.NNode;
-import presto.android.gui.graph.NObjectNode;
-import presto.android.gui.graph.NOpNode;
-import presto.android.gui.graph.NOptionsMenuNode;
-import presto.android.gui.graph.NSetIdOpNode;
-import presto.android.gui.graph.NSetImageResourceOpNode;
-import presto.android.gui.graph.NSetListenerOpNode;
-import presto.android.gui.graph.NSetTextOpNode;
-import presto.android.gui.graph.NStringConstantNode;
-import presto.android.gui.graph.NStringIdNode;
-import presto.android.gui.graph.NTabSpecNode;
-import presto.android.gui.graph.NVarNode;
-import presto.android.gui.graph.NViewAllocNode;
-import presto.android.gui.graph.NWidgetIdNode;
-import presto.android.gui.graph.NWindowNode;
 import presto.android.gui.listener.EventType;
 import presto.android.gui.listener.ListenerRegistration;
 import presto.android.gui.listener.ListenerSpecification;
 import presto.android.xml.XMLParser;
-import soot.ArrayType;
-import soot.Body;
-import soot.IntType;
-import soot.Local;
-import soot.LongType;
-import soot.PatchingChain;
-import soot.RefType;
-import soot.Scene;
-import soot.SootClass;
-import soot.SootField;
-import soot.SootMethod;
-import soot.Type;
-import soot.Unit;
-import soot.Value;
-import soot.VoidType;
-import soot.jimple.ArrayRef;
-import soot.jimple.AssignStmt;
-import soot.jimple.BreakpointStmt;
-import soot.jimple.CastExpr;
-import soot.jimple.CaughtExceptionRef;
-import soot.jimple.DefinitionStmt;
-import soot.jimple.Expr;
-import soot.jimple.FieldRef;
-import soot.jimple.GotoStmt;
-import soot.jimple.IfStmt;
-import soot.jimple.InstanceInvokeExpr;
-import soot.jimple.IntConstant;
-import soot.jimple.InvokeExpr;
-import soot.jimple.InvokeStmt;
-import soot.jimple.Jimple;
-import soot.jimple.JimpleBody;
-import soot.jimple.LookupSwitchStmt;
-import soot.jimple.MonitorStmt;
-import soot.jimple.NewArrayExpr;
-import soot.jimple.NewExpr;
-import soot.jimple.NewMultiArrayExpr;
-import soot.jimple.NopStmt;
-import soot.jimple.NullConstant;
-import soot.jimple.ParameterRef;
-import soot.jimple.RetStmt;
-import soot.jimple.ReturnStmt;
-import soot.jimple.ReturnVoidStmt;
-import soot.jimple.SpecialInvokeExpr;
-import soot.jimple.StaticInvokeExpr;
-import soot.jimple.Stmt;
-import soot.jimple.StringConstant;
-import soot.jimple.TableSwitchStmt;
-import soot.jimple.ThisRef;
-import soot.jimple.ThrowStmt;
+import soot.*;
+import soot.jimple.*;
 import soot.toolkits.scalar.Pair;
 import soot.util.Chain;
 
-import com.google.common.base.Function;
-import com.google.common.base.Objects;
-import com.google.common.base.Preconditions;
-import com.google.common.collect.HashMultimap;
-import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
-import com.google.common.collect.Multimap;
-import com.google.common.collect.Sets;
+import java.util.*;
 
 // This is the constraint graph described in our paper.
 public class FlowGraph implements MethodNames {
@@ -137,7 +48,6 @@ public class FlowGraph implements MethodNames {
     public Map<Integer, NMenuIdNode> allNMenuIdNodes = Maps.newHashMap();
     public Map<Integer, NWidgetIdNode> allNWidgetIdNodes = Maps.newHashMap();
     public Map<Integer, NStringIdNode> allNStringIdNodes = Maps.newHashMap();
-    public Map<Integer, NDrawableIdNode> allNDrawableIdNode = Maps.newHashMap();
     public Map<Stmt, NDialogNode> allNDialogNodes = Maps.newHashMap();
     // Right now, we don't distinguish string constants "allocated" at different
     // locations but contain the same value.
@@ -159,16 +69,14 @@ public class FlowGraph implements MethodNames {
     JimpleUtil jimpleUtil;
     GraphUtil graphUtil;
     XMLParser xmlUtil;
-    private final Set<Integer> allDrawableIds;
 
     public FlowGraph(Hierarchy hierarchy, Set<Integer> allLayoutIds, Set<Integer> allMenuIds, Set<Integer> allWidgetIds,
-                     Set<Integer> allStringIds, Set<Integer> allDrawableIds) {
+                     Set<Integer> allStringIds) {
         this.hierarchy = hierarchy;
         this.allLayoutIds = allLayoutIds;
         this.allMenuIds = allMenuIds;
         this.allWidgetIds = allWidgetIds;
         this.allStringIds = allStringIds;
-        this.allDrawableIds = allDrawableIds;
 
         this.listenerSpecs = ListenerSpecification.v();
 
@@ -190,9 +98,6 @@ public class FlowGraph implements MethodNames {
         }
         for (Integer i : allStringIds) {
             stringIdNode(i);
-        }
-        for (Integer i : allDrawableIds) {
-            drawableIdNode(i);
         }
     }
 
@@ -728,14 +633,6 @@ public class FlowGraph implements MethodNames {
             }
         }
 
-        // SetImageResource: view.setImageResource(id)
-        {
-            NOpNode setImageResource = createSetImageResourceOpNode(s);
-            if (setImageResource != null) {
-                return setImageResource;
-            }
-        }
-
         // SetListener: view.setXYZListener(listener)
         {
             NOpNode setListener = createSetListenerOpNode(s);
@@ -749,14 +646,6 @@ public class FlowGraph implements MethodNames {
             NOpNode addMenuItem = createAddMenuItemOpNode(s);
             if (addMenuItem != null) {
                 return addMenuItem;
-            }
-        }
-
-        // MenuItemSetTitle: menuItem.setTitle(titleSpecifier)
-        {
-            NOpNode menuItemSetTitle = createMenuItemSetTitleOpNode(s);
-            if (menuItemSetTitle != null) {
-                return menuItemSetTitle;
             }
         }
 
@@ -784,45 +673,10 @@ public class FlowGraph implements MethodNames {
             }
         }
 
-        // GetSensorObject: lhs = SensorManager.getDefaultSensor
-        {
-            NOpNode getSensor = createSensorObjectOpNode(s);
-            if (getSensor != null) {
-                return getSensor;
-            }
-        }
-
         // SensorManager.registerListener(...)
         {
             return null;
         }
-    }
-
-    private NOpNode createSetImageResourceOpNode(Stmt s) {
-        InvokeExpr ie = s.getInvokeExpr();
-        SootMethod callee = ie.getMethod();
-        String subsig = callee.getSubSignature();
-
-        if (!subsig.equals(setImageSubSig)) {
-            return null;
-        }
-        Local rcv = jimpleUtil.receiver(ie);
-        SootClass rcvClass = ((RefType) rcv.getType()).getSootClass();
-        if (!hierarchy.viewClasses.contains(rcvClass)) {
-            return null;
-        }
-        NVarNode receiverNode = varNode(rcv);
-
-        Value viewId = ie.getArg(0);
-        NNode idNode = simpleNode(viewId);
-        if (idNode == null) {
-            return null;
-        }
-
-        NOpNode setImageResource = new NSetImageResourceOpNode(idNode, receiverNode,
-                new Pair<Stmt, SootMethod>(s, jimpleUtil.lookup(s)), false);
-
-        return setImageResource;
     }
 
     // Inflate1: view = inflater.inflate(id)
@@ -1055,10 +909,9 @@ public class FlowGraph implements MethodNames {
         // Type 1: returns all descendants, including root
         boolean match1 = subsig.equals("android.view.View findFocus()")
                 || subsig.equals("android.view.View findViewWithTag()")
-                || subsig.equals("android.view.View focusSearch(int)") ||
+                || subsig.equals("android.view.View focusSearch(int)")
                 // NOTE: View has a methods getFocusables which returns an
                 // ArrayList of views. Do not handle this right now.
-                subsig.equals("android.view.View focusSearch(int)")
                 || subsig.equals("android.view.View focusSearch(android.view.View,int)");
 
         // Type 2: returns all (immediate) children
@@ -1166,7 +1019,7 @@ public class FlowGraph implements MethodNames {
             return null;
         }
 
-        return new NSetIdOpNode(idNode, receiverNode, new Pair<Stmt, SootMethod>(s, jimpleUtil.lookup(s)),
+        return new NSetIdOpNode(idNode, receiverNode, new Pair<>(s, jimpleUtil.lookup(s)),
                 false);
     }
 
@@ -1248,10 +1101,9 @@ public class FlowGraph implements MethodNames {
 
         // We can process onCreateContextMenu at this time.
         // TODO(tony): this actually is not perfect. Rethink this at some point.
-        boolean shouldProcessFlow = isContextMenuSetListener;
 
         return createSetListenerAndProcessFlow(viewLocal, listenerLocal, s, caller, isContextMenuSetListener,
-                registration, listenerClass, listenerParameterType, shouldProcessFlow, null, false);
+                registration, listenerClass, listenerParameterType, isContextMenuSetListener, null, false);
     }
 
     Set<NSetListenerOpNode> alreadyProcessedSetListeners = Sets.newHashSet();
@@ -1369,7 +1221,7 @@ public class FlowGraph implements MethodNames {
 
     Set<FlowFromSetListenerToEventHandlers> tasks = Sets.newHashSet();
 
-    class FlowFromSetListenerToEventHandlers {
+    static class FlowFromSetListenerToEventHandlers {
         SootClass listenerClass;
         SootClass listenerParameterType;
         NVarNode listenerNode;
@@ -1498,26 +1350,6 @@ public class FlowGraph implements MethodNames {
         return Collections.unmodifiableSet(hierarchy.getSubtypes(declaredListenerType));
     }
 
-    Set<SootClass> computePossibleListenerTypesPTA(NVarNode listenerNode) {
-        Set<SootClass> types = Sets.newHashSet();
-        Set<NNode> listenerObjects = graphUtil.backwardReachableNodes(listenerNode);
-        for (NNode n : listenerObjects) {
-            if (!(n instanceof NObjectNode)) {
-                continue;
-            }
-            types.add(((NObjectNode) n).getClassType());
-        }
-        return types;
-    }
-
-    // AddMenuItem: menuItem = menu.add([...,]titleSpecifier)
-    // "instrument" ->
-    // menuItem = InflNode(MenuItem)
-    // AddView2: menu.addView(menuItem)
-    // SetText: menuItem.setTitle(titleSpecifier)
-    //
-    // titleSepcifier is the last parameter in the original call. it could be
-    // either a string id or a string constant.
     public NOpNode createAddMenuItemOpNode(Stmt s) {
         InvokeExpr ie = s.getInvokeExpr();
         SootMethod callee = ie.getMethod();
@@ -1541,8 +1373,6 @@ public class FlowGraph implements MethodNames {
         NVarNode menuItem = varNode(lhsLocal);
         inflMenuItem.addEdgeTo(menuItem, s);
         if (menuAdd4IntSubSig.equals(subsig) || menuAdd3IntCharSeqSubSig.equals(subsig)) {
-            // System.out.println("{SetMenuItemId} " + s + " @ " +
-            // currentMethod);
             Value itemId = ie.getArg(1);
             menuItemSetItemId(inflMenuItem, itemId);
         }
@@ -1551,16 +1381,7 @@ public class FlowGraph implements MethodNames {
         Local receiverLocal = jimpleUtil.receiver(ie);
         NVarNode menu = varNode(receiverLocal);
         Pair<Stmt, SootMethod> callSite = new Pair<Stmt, SootMethod>(s, jimpleUtil.lookup(s));
-        NOpNode addMenuItem = new NAddView2OpNode(menu, menuItem, callSite, false);
-
-        // SetText: menuItem.setTitle(titleSpecifier)
-        Value lastArgument = ie.getArg(ie.getArgCount() - 1);
-        NNode titleSpecifier = simpleNode(lastArgument);
-        if (titleSpecifier != null) {
-            NOpNode setText = new NSetTextOpNode(titleSpecifier, menuItem, callSite);
-            allNNodes.add(setText);
-        }
-        return addMenuItem;
+        return new NAddView2OpNode(menu, menuItem, callSite, false);
     }
 
     Map<NInflNode, Set<NVarNode>> pendingMenuItems = Maps.newHashMap();
@@ -1571,33 +1392,6 @@ public class FlowGraph implements MethodNames {
         } else if (itemId instanceof Local) {
             MultiMapUtil.addKeyAndHashSetElement(pendingMenuItems, menuItem, varNode((Local) itemId));
         }
-    }
-
-    // MenuItemSetTitle: menuItem.setTitle(titleSpecifier)
-    // model as a NSetTextOpNode
-    public NOpNode createMenuItemSetTitleOpNode(Stmt s) {
-        InvokeExpr ie = s.getInvokeExpr();
-        SootMethod callee = ie.getMethod();
-        String subsig = callee.getSubSignature();
-        boolean isMenuItemSetTitle = menuItemSetTitleCharSeqSubSig.equals(subsig)
-                || menuItemSetTitleIntSubSig.equals(subsig);
-        if (!isMenuItemSetTitle) {
-            return null;
-        }
-        NNode titleNode = simpleNode(ie.getArg(0));
-        if (titleNode == null) {
-            return NOpNode.NullNode;
-        }
-        NVarNode receiverNode = varNode(jimpleUtil.receiver(ie));
-        SootMethod caller = jimpleUtil.lookup(s);
-        Pair<Stmt, SootMethod> callSite = new Pair<Stmt, SootMethod>(s, caller);
-        NOpNode setText = new NSetTextOpNode(titleNode, receiverNode, callSite);
-
-        if (s instanceof DefinitionStmt) {
-            NVarNode lhsNode = varNode(jimpleUtil.lhsLocal(s));
-            receiverNode.addEdgeTo(lhsNode, s);
-        }
-        return setText;
     }
 
     // MenuInflate: menuInflater.inflate(menuId, menu)
@@ -1641,7 +1435,7 @@ public class FlowGraph implements MethodNames {
             throw new RuntimeException("[Error]: we can not identify the id for layout \"tab_content\"");
         }
 
-        NNode layoutIdNode = simpleNode(IntConstant.v(layoutId.intValue()));
+        NNode layoutIdNode = simpleNode(IntConstant.v(layoutId));
 
         if (!(layoutIdNode instanceof NLayoutIdNode)) {
             throw new RuntimeException("[Error]: we can not create a LayoutIdNode from id: " + layoutId.intValue());
@@ -1660,55 +1454,13 @@ public class FlowGraph implements MethodNames {
         if (hostId == null) {
             throw new RuntimeException("[Error]: we can not identify the id for host \"tabhost\"");
         }
-        Value hostVal = IntConstant.v(hostId.intValue());
+        Value hostVal = IntConstant.v(hostId);
         NNode hostValNode = simpleNode(hostVal);
-        NOpNode findView2 = new NFindView2OpNode(hostValNode, receiverNode, lhsNode,
-                new Pair<Stmt, SootMethod>(s, jimpleUtil.lookup(s)), false);
 
-        return findView2;
+        return new NFindView2OpNode(hostValNode, receiverNode, lhsNode,
+                new Pair<>(s, jimpleUtil.lookup(s)), false);
     }
 
-    public NOpNode createSensorObjectOpNode(Stmt s) {
-        InvokeExpr ie = s.getInvokeExpr();
-        SootMethod callee = ie.getMethod();
-        String sig = callee.getSignature();
-        if ((!sig.equals(getDefaultSensorSig)) && (!sig.equals(getDefaultSensor2Sig))) {
-            return null;
-        }
-
-        if (!(s instanceof DefinitionStmt)) {
-            return null;
-        }
-
-        // The receiver is always an instance of SensorManager.
-        // Don't need to worry about it.
-        Value lhs = ((DefinitionStmt) s).getLeftOp();
-
-        return null;
-    }
-
-    /**
-     * Models "lhs=act.getListView()". Interesting code that may get executed
-     * when act.getListView() is called includes the following:
-     * act.setContentView( com.android.internal.R.layout.list_content_simple);
-     * mList = (ListView)findViewById(com.android.internal.R.id.list); return
-     * mList;
-     *
-     * It can literally be modeled with: Inflate2: act.setContentView(
-     * com.android.internal.R.layout.list_content_simple) FindView2: lhs =
-     * act.findViewById(com.android.internal.R.id.list)
-     *
-     * However, if the app inflates its own layout with ListView:list in it, the
-     * framework-defined layout will not get inflated. So, we will treat this
-     * call as a simple findViewById(list), and later patch in the default
-     * layout if the app does not call setContentView().
-     *
-     * Note that AlertDialog has a getListView() method too, but it has a
-     * different meaning.
-     *
-     * @param s
-     * @return
-     */
     public NOpNode createListActivityGetListViewOpNode(Stmt s) {
         InvokeExpr ie = s.getInvokeExpr();
         SootMethod callee = ie.getMethod();
@@ -1927,10 +1679,6 @@ public class FlowGraph implements MethodNames {
     }
 
     void patchRootlessListActivity(NActivityNode activity) {
-        // System.out.println("[FlowGraph] Patching " + activity);
-        // Inflate2
-        // Starting from 4.0.1_r1 onward, it's list_content_simple. Before that,
-        // it's list_content.
         int layoutId;
         if (Configs.numericApiLevel >= 14) {
             layoutId = xmlUtil.getSystemRLayoutValue("list_content_simple");
@@ -2129,21 +1877,6 @@ public class FlowGraph implements MethodNames {
         }
     }
 
-    void dumpRecordedListViewCalls() {
-        System.out.println("[TRan2mat] --- setAdapter");
-        for (Stmt s : listViewSetAdapterCalls) {
-            System.out.println("[TRan2mat]   * " + s);
-        }
-        System.out.println("[TRan2mat] --- adapter.<init>");
-        for (Stmt s : listAdapterConstructorCalls) {
-            System.out.println("[TRan2mat]   * " + s);
-        }
-        System.out.println("[TRan2mat] --- getView");
-        for (Stmt s : listAdapterGetViewCalls) {
-            System.out.println("[TRan2mat]   * " + s);
-        }
-    }
-
     public void connectListViewWithGetView(Stmt setAdapterCall) {
         InvokeExpr ie = setAdapterCall.getInvokeExpr();
         Local receiver = jimpleUtil.receiver(ie);
@@ -2289,9 +2022,6 @@ public class FlowGraph implements MethodNames {
      * now, we only handle ArrayAdapter. If it is ArrayAdapter, we know the
      * value at position 1 is the layout id. Otherwise, we look into the body of
      * the constructor method.
-     *
-     * @param stmt
-     * @return
      */
     public Value extractLayoutIdFromAdapterConstructor(Stmt stmt) {
         if (extractIdDebug) {
@@ -3138,13 +2868,8 @@ public class FlowGraph implements MethodNames {
             }
             dismisses.add(dismissStmt);
         }
-        // System.out.println(
-        // "[dismiss] " + dismissStmt + "[" + dismissStmt.hashCode() + "]"
-        // + " | " + fakeOnClickMethod);
 
         units.add(jimple.newReturnVoidStmt());
-        // System.out.println("--- " + fakeOnClickMethod);
-        // System.out.println(fakeOnClickMethod.retrieveActiveBody() + "\n");
 
         // record
         fakeHandlerToRealHandler.put(fakeOnClickMethod, handlerMethod);
@@ -3565,7 +3290,7 @@ public class FlowGraph implements MethodNames {
     // lhs TabSpec to TabHost.newTabSpec(String) calls
     // Map<Local, Set<Stmt>> tabHostNewTabSpecCalls = Maps.newHashMap();
 
-    // TabSpec local to indicator strategy type recorded due to setIndiactor
+    // TabSpec local to indicator strategy type recorded due to setIndicator
     Map<Local, Set<Stmt>> tabSpecLabelIndicators = Maps.newHashMap();
     Map<Local, Set<Stmt>> tabSpecViewIndicators = Maps.newHashMap();
 
@@ -3936,12 +3661,12 @@ public class FlowGraph implements MethodNames {
      * NOTE(tony): we assume on*ItemSelected is always defined in the same class
      * as corresponding onCreate*Menu and onPrepare*Menu.
      */
-    SootMethod modelFlowFromCreateOrPrepareMenuToItemSelected(NNode menuNode, SootClass menuClass,
-                                                              SootClass activityClass, SootMethod createOrPrepareMenuMethod, String itemSelectedSubsig,
-                                                              int menuItemPosition) {
+    void modelFlowFromCreateOrPrepareMenuToItemSelected(NNode menuNode, SootClass menuClass,
+                                                        SootClass activityClass, SootMethod createOrPrepareMenuMethod, String itemSelectedSubsig,
+                                                        int menuItemPosition) {
         SootClass itemSelectedClass = hierarchy.matchForVirtualDispatch(itemSelectedSubsig, activityClass);
         if (itemSelectedClass == null || !itemSelectedClass.isApplicationClass()) {
-            return null;
+            return;
         }
         SootMethod itemSelectedMethod = itemSelectedClass.getMethod(itemSelectedSubsig);
         if (menuNode == null) {
@@ -3955,7 +3680,6 @@ public class FlowGraph implements MethodNames {
         }
         modelFlowFromCreateOrPrepareMenuToItemSelected(menuNode, menuClass, activityClass, createOrPrepareMenuMethod,
                 itemSelectedMethod, menuItemPosition);
-        return itemSelectedMethod;
     }
 
     void modelFlowFromCreateOrPrepareMenuToItemSelected(NNode menuNode, SootClass menuClass, SootClass activityClass,
@@ -4201,18 +3925,6 @@ public class FlowGraph implements MethodNames {
         return stringIdNode;
     }
 
-    public NDrawableIdNode drawableIdNode(Integer drawableId) {
-        Preconditions.checkNotNull(drawableId);
-        NDrawableIdNode drawableIdNode = allNDrawableIdNode.get(drawableId);
-        if (drawableIdNode == null) {
-            drawableIdNode = new NDrawableIdNode(drawableId);
-            allNDrawableIdNode.put(drawableId, drawableIdNode);
-            allNNodes.add(drawableIdNode);
-            // System.out.println("{FlowGraph.stringIdNode} " + stringIdNode);
-        }
-        return drawableIdNode;
-    }
-
     public NStringConstantNode stringConstantNode(String value) {
         Preconditions.checkNotNull(value);
         NStringConstantNode stringConstantNode = allNStringConstantNodes.get(value);
@@ -4246,10 +3958,6 @@ public class FlowGraph implements MethodNames {
             if (allStringIds.contains(integerConstant)) {
                 return stringIdNode(integerConstant);
             }
-
-            if (allDrawableIds.contains(integerConstant)) {
-                return drawableIdNode(integerConstant);
-            }
         }
         if (jimpleValue instanceof StringConstant) {
             String stringValue = ((StringConstant) jimpleValue).value;
@@ -4267,52 +3975,7 @@ public class FlowGraph implements MethodNames {
 
     // === END of nodes
 
-    /*
-     * void preProcessAppClasses(){ Map<Integer, Pair<String, Boolean>>
-     * callbacks = XMLParser.Factory.getXMLParser().retrieveCallbacks();
-     * if(callbacks.isEmpty()){ return; } for(SootClass appClz :
-     * hierarchy.appClasses){ for (Iterator<SootMethod> iter =
-     * appClz.getMethods().iterator(); iter.hasNext();) { currentMethod =
-     * iter.next(); if (!currentMethod.isConcrete()) { continue; } Body body =
-     * currentMethod.retrieveActiveBody(); PatchingChain<Unit> units =
-     * body.getUnits(); Iterator<Unit> stmtItr = units.snapshotIterator();
-     * while(stmtItr.hasNext()){ currentStmt = (Stmt) stmtItr.next(); if
-     * (currentStmt instanceof ReturnVoidStmt) { continue; } if (currentStmt
-     * instanceof ThrowStmt) { continue; } if (currentStmt instanceof GotoStmt)
-     * { continue; } if (currentStmt instanceof BreakpointStmt) { continue; } if
-     * (currentStmt instanceof NopStmt) { continue; } if (currentStmt instanceof
-     * RetStmt) { continue; } if (currentStmt instanceof IfStmt) { continue; }
-     * if (currentStmt instanceof TableSwitchStmt) { continue; } if (currentStmt
-     * instanceof LookupSwitchStmt) { continue; } if (currentStmt instanceof
-     * MonitorStmt) { continue; } if (currentStmt.containsInvokeExpr()){ NOpNode
-     * findView2 = createFindView2OpNode(currentStmt); if (findView2 != null &&
-     * (currentStmt instanceof DefinitionStmt)) { DefinitionStmt as1 =
-     * (DefinitionStmt) currentStmt; Value rhs1 = as1.getRightOp(); Value lhs2 =
-     * as2.getLeftOp(); if(!(rhs1 instanceof VirtualInvokeExpr)) continue;
-     * VirtualInvokeExpr expr = (VirtualInvokeExpr)rhs1; if(!(expr.getArg(0)
-     * instanceof IntConstant)) continue; Integer id =
-     * ((IntConstant)expr.getArg(0)).value; Boolean isCreated =
-     * callBacksInXML.get(id).getO2(); if(isCreated) continue; else isCreated =
-     * true; String callBackName = callBacksInXML.get(id).getO1();
-     * if(callBackName == null) continue; String fakeMethodName =
-     * "fake"+callBackName+id; SootClass createdClass =
-     * createFakeOnClickListenerClass(c.getName().toString(),callBackName,
-     * fakeMethodName); SootMethod fakeMethod =
-     * createFakeMethod(c,fakeMethodName,createdClass); Jimple jimple =
-     * Jimple.v(); Expr virtualInvokeExpr =
-     * jimple.newVirtualInvokeExpr(b.getThisLocal(), fakeMethod.makeRef(),
-     * Lists.newArrayList(lhs2)); Stmt virtualInvokeStmt =
-     * Jimple.v().newInvokeStmt(virtualInvokeExpr);
-     * units.insertAfter(virtualInvokeStmt, nextStmt); } } } } } }
-     */
-
-    /**
-     * Inflate Menu Items.
-     *
-     * @param c
-     * @param attrs
-     * @return
-     */
+    // Inflate Menu Items.
     public NMenuItemInflNode inflMenuItemNode(SootClass c, HashMap<String, String> attrs) {
         NMenuItemInflNode x = new NMenuItemInflNode();
         x.c = c;

@@ -19,7 +19,6 @@ import presto.android.gui.FlowGraph;
 import presto.android.gui.GUIAnalysisOutput;
 import presto.android.gui.IDNameExtractor;
 import presto.android.gui.JimpleUtil;
-import presto.android.gui.PropertyManager;
 import presto.android.gui.graph.NContextMenuNode;
 import presto.android.gui.graph.NDialogNode;
 import presto.android.gui.graph.NIdNode;
@@ -44,7 +43,6 @@ public class StaticGUIHierarchy extends GUIHierarchy {
     FlowGraph flowgraph;
     Hierarchy hier = Hierarchy.v();
     JimpleUtil jimpleUtil = JimpleUtil.v();
-    PropertyManager prop = PropertyManager.v();
     IDNameExtractor idNameExtractor = IDNameExtractor.v();
 
     public StaticGUIHierarchy(GUIAnalysisOutput output) {
@@ -72,11 +70,13 @@ public class StaticGUIHierarchy extends GUIHierarchy {
 
     void buildActivities() {
         for (SootClass activityClass : analysisOutput.getActivities()) {
-            System.out.printf("  - Activity: %s%n", activityClass.getName());
             currentActivity = activityClass;
             Activity act = new Activity();
             activities.add(act);
             act.name = activityClass.getName();
+            if (Objects.equals(act.name, "com.mediaaz.bryanadamtopfree.ImagesActivity")) {
+                int a = 12;
+            }
 
             traverseRootViewAndHierarchy(
                     act, analysisOutput.getActivityRoots(activityClass));
@@ -89,7 +89,6 @@ public class StaticGUIHierarchy extends GUIHierarchy {
 
     void buildDialogs() {
         for (NDialogNode dialogNode : analysisOutput.getDialogs()) {
-            System.out.printf("  - Dialog: %s%n", dialogNode.c);
             Dialog dialog = new Dialog();
             dialogs.add(dialog);
             dialog.name = dialogNode.c.getName();
@@ -153,13 +152,8 @@ public class StaticGUIHierarchy extends GUIHierarchy {
                     throw new RuntimeException(
                             "MenuItem: " + inflNode + " is not a leaf!");
                 }
-                String title = prop.getSpeciallySeparatedTextOrTitlesOfView(inflNode);
-                if (title == null) {
-                    title = NO_TITLE;
-                }
                 View view = new View();
                 view.type = type.getName();
-                view.title = title;
                 Pair<Integer, String> idAndName = getIdAndName(node.idNode);
                 view.id = idAndName.getO1();
                 view.idName = idAndName.getO2();
@@ -173,11 +167,14 @@ public class StaticGUIHierarchy extends GUIHierarchy {
         // Now, print other types of nodes. First, the open tag.
         Pair<Integer, String> idAndName = getIdAndName(node.idNode);
         View view = new View();
-        parent.addChild(view);
-        buildEventAndHandlers(view, node);
         view.type = type.getName();
-        view.id = idAndName.getO1();
+        view.id = idAndName.getO1();;
         view.idName = idAndName.getO2();
+        parent.addChild(view);
+
+        if (view.id != -1) {
+            buildEventAndHandlers(view, node);
+        }
 
         // print children
         for (NNode n : objectNode.getChildren()) {
@@ -237,7 +234,6 @@ public class StaticGUIHierarchy extends GUIHierarchy {
         }
     }
 
-    final String NO_TITLE = "NO_TITLE";
     final String NO_ID_NAME = "NO_ID";
     final Pair<Integer, String> NO_ID = new Pair<>(-1, NO_ID_NAME);
 
@@ -247,7 +243,6 @@ public class StaticGUIHierarchy extends GUIHierarchy {
         }
         Integer id = idNode.getIdValue();
         String name = idNode.getIdName();
-        System.out.printf("%s %s%n", id, name);
         if (idNameExtractor.isUnknown(name)) {
             return NO_ID;
         } else {

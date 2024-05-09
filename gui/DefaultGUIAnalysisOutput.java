@@ -125,7 +125,8 @@ public class DefaultGUIAnalysisOutput implements GUIAnalysisOutput {
 	// callback registration statements satisfying a specified condition.
 	public Set<Stmt> getCallbackRegistrations(NObjectNode guiObject, Predicate<EventType> condition) {
 		Set<Stmt> result = Sets.newHashSet();
-		for (NOpNode opNode : NOpNode.getNodes(NSetListenerOpNode.class)) {
+		Set<NOpNode> setListenerNodes = NOpNode.getNodes(NSetListenerOpNode.class);
+		for (NOpNode opNode : setListenerNodes) {
 			NSetListenerOpNode setListener = (NSetListenerOpNode) opNode;
 			Set<NNode> receiverSet = solver.solutionReceivers.get(setListener);
 			if (receiverSet != null && receiverSet.contains(guiObject)) {

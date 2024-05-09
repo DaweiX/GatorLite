@@ -28,7 +28,6 @@ public class AndroidView implements IAndroidView {
 
     private SootClass klass;
     private Integer id;
-    private String text;
 
     // Absolute path or full class name where this view is declared.
     private String origin;
@@ -50,7 +49,6 @@ public class AndroidView implements IAndroidView {
             AndroidView tgt = p.getO2();
             tgt.klass = src.klass;
             tgt.id = src.id;
-            tgt.text = src.text;
             tgt.origin = src.origin;
 
             int sz = src.getNumberOfChildren();
@@ -199,14 +197,13 @@ public class AndroidView implements IAndroidView {
         return SourceLocator.v().getClassSource(className) != null;
     }
 
-    public void save(int guiId, String text, String guiName) {
+    public void save(int guiId, String guiName) {
         Integer i = null;
         if (guiId != -1) {
             i = guiId;
         }
         this.id = i;
 
-        this.text = text;
         if (!Configs.preRun) {
             try {
                 klass = resolveGUIName(guiName);
@@ -268,14 +265,6 @@ public class AndroidView implements IAndroidView {
 
     public void setId(Integer id) {
         this.id = id;
-    }
-
-    public String getText() {
-        return text;
-    }
-
-    public void setText(String text) {
-        this.text = text;
     }
 
     public String getOrigin() {

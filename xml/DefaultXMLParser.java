@@ -135,11 +135,6 @@ class DefaultXMLParser extends AbstractXMLParser {
 		return lookupNameInGeneralMap("string", value, false);
 	}
 
-	@Override
-	public String getStringValue(Integer idValue) {
-		return intAndStringValues.get(idValue);
-	}
-
 	String ATTR_LAUNCH_MODE = FLOW_DROID_LAYOUT ? "launchMode" : "android:launchMode";
 
 	private static DefaultXMLParser theInst;
@@ -575,20 +570,7 @@ class DefaultXMLParser extends AbstractXMLParser {
 				guiName = "android.view.MenuItem";
 			}
 
-			// Retrieve callback (android:onClick)
-			if (guiId != -1) {
-				String cb = "android:onClick";
-				String callback = readAndroidCallback(attrMap, cb);
-				if (callback != null) {
-					Pair<String, Boolean> pair = new Pair<>(callback, false);
-					this.callbacksXML.put(guiId, pair);
-				}
-			}
-
-			// Retrieve text (android:text)
-			String text = readAndroidTextOrTitle(attrMap, TEXT_ATTR);
-
-			view.save(guiId, text, guiName);
+			view.save(guiId, guiName);
 
 			NodeList children = node.getChildNodes();
 			for (int i = 0; i < children.getLength(); i++) {
@@ -598,16 +580,10 @@ class DefaultXMLParser extends AbstractXMLParser {
 					continue;
 				}
 				if ("#text".equals(nodeName)) {
-					// possible for XML files created on a different operating
-					// system
-					// than the one our analysis is run on
 					continue;
 				}
 				if (nodeName.equals("requestFocus")) {
 					continue;
-				}
-				if (!newNode.hasAttributes() && !"TableRow".equals(nodeName) && !"View".equals(nodeName)) {
-					System.err.println("[WARNING] no attribute node " + newNode.getNodeName());
 				}
 
 				if (newNode.getNodeName().equals("include")) {
@@ -926,9 +902,8 @@ class DefaultXMLParser extends AbstractXMLParser {
                     guiName = "android.view.ViewGroup";
                     break;
             }
-			String text = readAndroidTextOrTitle(attrMap, TITLE_ATTR);
 
-			view.save(guiId, text, guiName);
+			view.save(guiId, guiName);
 			NodeList children = node.getChildNodes();
 			for (int i = 0; i < children.getLength(); i++) {
 				Node newNode = children.item(i);
@@ -991,52 +966,6 @@ class DefaultXMLParser extends AbstractXMLParser {
 		for (String file : getStringXMLFilePaths(Configs.sysProj + "/res", true)) {
 			readStrings(file, sysIntAndStringValues, sysRStringAndStringValues, sysRGeneralIdMap.get("string"));
 		}
-	}
-
-	final static String SYS_ANDROID_STRING_REF = "@android:string/";
-	final static int SYS_ANDROID_STRING_REF_LENGTH = SYS_ANDROID_STRING_REF.length();
-
-	final static String ANOTHER_SYS_ANDROID_STRING_REF = "@*android:string/";
-	final static int ANOTHER_SYS_ANDROID_STRING_REF_LENGTH = ANOTHER_SYS_ANDROID_STRING_REF.length();
-
-	final static String MOSTLY_APP_ANDROID_STRING_REF = "@string/";
-	final static int MOSTLY_APP_ANDROID_STRING_REF_LENGTH = MOSTLY_APP_ANDROID_STRING_REF.length();
-
-	String convertAndroidTextToString(String androidText) {
-		if (androidText.isEmpty()) {
-			return null;
-		}
-		// Is it string ref
-		if (androidText.charAt(0) == '@') {
-			if (androidText.startsWith(SYS_ANDROID_STRING_REF)) {
-				return sysRStringAndStringValues.get(androidText.substring(SYS_ANDROID_STRING_REF_LENGTH));
-			}
-			if (androidText.startsWith(ANOTHER_SYS_ANDROID_STRING_REF)) {
-				return sysRStringAndStringValues.get(androidText.substring(ANOTHER_SYS_ANDROID_STRING_REF_LENGTH));
-			}
-			if (androidText.startsWith(MOSTLY_APP_ANDROID_STRING_REF)) {
-				String stringName = androidText.substring(MOSTLY_APP_ANDROID_STRING_REF_LENGTH);
-				String result = rStringAndStringValues.get(stringName);
-				if (result == null) {
-					result = sysRStringAndStringValues.get(stringName);
-				}
-				return result;
-			}
-			// Workaround for a weird case in XBMC
-			return null;
-		} else {
-			return androidText;
-		}
-	}
-
-	String readAndroidTextOrTitle(NamedNodeMap attrMap, String attributeName) {
-		Node textNode = attrMap.getNamedItem(attributeName);
-		String text = null;
-		if (textNode != null) {
-			String refOrValue = textNode.getTextContent();
-			text = convertAndroidTextToString(refOrValue);
-		}
-		return text;
 	}
 
 	private void readStrings(String file, HashMap<Integer, String> idAndStrings,
@@ -1136,13 +1065,5 @@ class DefaultXMLParser extends AbstractXMLParser {
 			}
 		}
 		return null;
-	}
-
-	// record callbacks defined in xml
-	private final HashMap<Integer, Pair<String, Boolean>> callbacksXML = new HashMap<Integer, Pair<String, Boolean>>();
-
-	@Override
-	public Set<Integer> getDrawableIdValues() {
-		return invRGeneralIdMap.get("drawable").keySet();
 	}
 }

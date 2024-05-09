@@ -17,11 +17,5 @@ import soot.Local;
 // For a given GUI-related variable (GUI object, ID, activity, etc), return the
 // set of values this variable may reference.
 public interface VariableValueQueryInterface {
-  Set<NIdNode> idVariableValues(Local local);
-
-  Set<NObjectNode> activityVariableValues(Local local);
-
   Set<NObjectNode> guiVariableValues(Local local);
-
-  Set<NObjectNode> listenerVariableValues(Local local);
 }

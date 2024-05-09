@@ -37,22 +37,19 @@ public class GraphUtil {
   }
 
   public void findReachableNodes(NNode start, Set<NNode> reachableNodes) {
-    LinkedList<NNode> worklist = Lists.newLinkedList();
-    worklist.add(start);
+    LinkedList<NNode> workList = Lists.newLinkedList();
+    workList.add(start);
     reachableNodes.add(start);
-    while (!worklist.isEmpty()) {
-      NNode n = worklist.remove();
+    while (!workList.isEmpty()) {
+      NNode n = workList.remove();
       for (NNode s : n.getSuccessors()) {
         if (reachableNodes.contains(s)) {
           continue;
         }
         if (!(s instanceof NOpNode)) {
-          worklist.add(s);
+          workList.add(s);
         }
         reachableNodes.add(s);
-        if (verbose) {
-          System.out.println("[findReachableNodes] Edge: " + n + " --> " + s);
-        }
       }
     }
   }
@@ -72,9 +69,6 @@ public class GraphUtil {
       for (NNode s : n.getPredecessors()) {
         if (reachableNodes.contains(s)) {
           continue;
-        }
-        if (verbose) {
-          System.out.println("[findReachableNodes] Edge: " + n + " --> " + s);
         }
         if (s instanceof NOpNode) {
           if (!(start instanceof NOpNode)) {

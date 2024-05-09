@@ -19,23 +19,15 @@ public class MultiMapUtil {
   public static <Key, HashSetElement, SubClassOfHashSetElement extends HashSetElement>
   void addKeyAndHashSetElement(
       Map<Key, Set<HashSetElement>> map, Key key, SubClassOfHashSetElement element) {
-    Set<HashSetElement> set = map.get(key);
-    if (set == null) {
-      set = Sets.newHashSet();
-      map.put(key, set);
-    }
-    set.add(element);
+      Set<HashSetElement> set = map.computeIfAbsent(key, k -> Sets.newHashSet());
+      set.add(element);
   }
 
   public static <Key, HashSetElement, SubClassOfHashSetElement extends HashSetElement>
   void addKeyAndHashSet(
       Map<Key, Set<HashSetElement>> map, Key key, Set<SubClassOfHashSetElement> elements) {
-    Set<HashSetElement> set = map.get(key);
-    if (set == null) {
-      set = Sets.newHashSet();
-      map.put(key, set);
-    }
-    set.addAll(elements);
+      Set<HashSetElement> set = map.computeIfAbsent(key, k -> Sets.newHashSet());
+      set.addAll(elements);
   }
 
   public static <Key, HashSetElement> Set<HashSetElement>
