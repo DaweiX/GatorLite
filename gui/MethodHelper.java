@@ -25,8 +25,8 @@ public class MethodHelper {
     public String getUIIdFromSetListenerStmt(Stmt s) {
         // first, we check whether the ui is specified
         // by a class field, if so, return the field name
-        if (s instanceof VirtualInvokeExpr) return null;
-        VirtualInvokeExpr invokeExpr = (VirtualInvokeExpr) s.getInvokeExpr();
+        if (!(s instanceof InstanceInvokeExpr)) return null;
+        InstanceInvokeExpr invokeExpr = (InstanceInvokeExpr) s.getInvokeExpr();
         Value value = invokeExpr.getBaseBox().getValue();
         if (value instanceof FieldRef) {
             return value.toString();
